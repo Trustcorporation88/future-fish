@@ -16,24 +16,35 @@ else:
     # 如果根目录没有 .env，尝试加载环境变量（用于生产环境）
     load_dotenv(override=True)
 
+def _env_value(name: str, default: str | None = None) -> str | None:
+    """读取环境变量，并兼容 Warp/模板中常见的 {{valor}} 占位写法。"""
+    value = os.environ.get(name, default)
+    if value is None:
+        return None
+
+    value = value.strip()
+    if value.startswith('{{') and value.endswith('}}') and len(value) > 4:
+        value = value[2:-2].strip()
+    return value
+
 
 class Config:
     """Flask配置类"""
     
     # Flask配置
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'mirofish-secret-key')
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    SECRET_KEY = _env_value('SECRET_KEY', 'mirofish-secret-key')
+    DEBUG = _env_value('FLASK_DEBUG', 'True').lower() == 'true'
     
     # JSON配置 - 禁用ASCII转义，让中文直接显示（而不是 \uXXXX 格式）
     JSON_AS_ASCII = False
     
     # LLM配置（统一使用OpenAI格式）
-    LLM_API_KEY = os.environ.get('LLM_API_KEY')
-    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
-    LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
+    LLM_API_KEY = _env_value('LLM_API_KEY')
+    LLM_BASE_URL = _env_value('LLM_BASE_URL', 'https://api.openai.com/v1')
+    LLM_MODEL_NAME = _env_value('LLM_MODEL_NAME', 'gpt-4o-mini')
     
     # Zep配置
-    ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
+    ZEP_API_KEY = _env_value('ZEP_API_KEY')
     
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
