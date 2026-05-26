@@ -129,41 +129,68 @@
             <!-- 上传区域 -->
             <div class="console-section">
               <div class="console-header">
-                <span class="console-label">{{ $t('home.realitySeed') }}</span>
+                <span class="console-label">{{ $t('home.eventDocuments') || 'EVENT DOCUMENTS' }}</span>
                 <span class="console-meta">{{ $t('home.supportedFormats') }}</span>
               </div>
               
               <div 
                 class="upload-zone"
-                :class="{ 'drag-over': isDragOver, 'has-files': files.length > 0 }"
+                :class="{ 'drag-over': isDragOver, 'has-files': files.length > 0 || urls.length > 0 }"
                 @dragover.prevent="handleDragOver"
                 @dragleave.prevent="handleDragLeave"
                 @drop.prevent="handleDrop"
                 @click="triggerFileInput"
+                @paste.prevent="handlePaste"
               >
                 <input
                   ref="fileInput"
                   type="file"
                   multiple
-                  accept=".pdf,.md,.txt"
+                  accept=".pdf,.md,.txt,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.webp"
                   @change="handleFileSelect"
                   style="display: none"
                   :disabled="loading"
                 />
                 
-                <div v-if="files.length === 0" class="upload-placeholder">
-                  <div class="upload-icon">↑</div>
+                <div v-if="files.length === 0 && urls.length === 0" class="upload-placeholder">
+                  <div class="upload-icon">📑</div>
                   <div class="upload-title">{{ $t('home.dragToUpload') }}</div>
                   <div class="upload-hint">{{ $t('home.orBrowse') }}</div>
+                  <div class="upload-examples">PDF, MD, TXT, XLS, JPG, PNG ou cole imagens aqui</div>
+                  <div class="upload-url-hint">Ou adicione um link abaixo ↓</div>
                 </div>
                 
                 <div v-else class="file-list">
-                  <div v-for="(file, index) in files" :key="index" class="file-item">
-                    <span class="file-icon">📄</span>
-                    <span class="file-name">{{ file.name }}</span>
+                  <div v-for="(item, index) in displayItems" :key="index" class="file-item" :class="{ 'url-item': item.type === 'url' }">
+                    <span class="file-icon">{{ item.type === 'url' ? '🔗' : getFileIcon(item.name) }}</span>
+                    <span class="file-name" :title="item.name">{{ item.name }}</span>
                     <button @click.stop="removeFile(index)" class="remove-btn">×</button>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <!-- URL 输入区域 -->
+            <div class="console-section">
+              <div class="console-header">
+                <span class="console-label">{{ $t('home.addUrl') || 'ADD LINK/URL' }}</span>
+              </div>
+              <div class="url-input-wrapper">
+                <input
+                  v-model="formData.urlInput"
+                  type="text"
+                  class="url-input"
+                  placeholder="https://example.com ou título da fonte"
+                  @keydown.enter="addUrl"
+                  :disabled="loading"
+                />
+                <button 
+                  @click="addUrl" 
+                  class="url-add-btn"
+                  :disabled="loading || !formData.urlInput.trim()"
+                >
+                  ✓ Add
+                </button>
               </div>
             </div>
 
@@ -221,11 +248,13 @@ const router = useRouter()
 
 // 表单数据
 const formData = ref({
-  simulationRequirement: ''
+  simulationRequirement: '',
+  urlInput: ''
 })
 
-// 文件列表
+// 文件列表和 URLs
 const files = ref([])
+const urls = ref([])
 
 // 状态
 const loading = ref(false)
@@ -237,7 +266,16 @@ const fileInput = ref(null)
 
 // 计算属性:是否可以提交
 const canSubmit = computed(() => {
-  return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
+  const hasRequirement = formData.value.simulationRequirement.trim() !== ''
+  const hasInput = files.value.length > 0 || urls.value.length > 0
+  return hasRequirement && hasInput
+})
+
+// 计算属性: 显示所有项目（文件 + URLs）
+const displayItems = computed(() => {
+  const fileItems = files.value.map(f => ({ name: f.name, type: 'file' }))
+  const urlItems = urls.value.map(u => ({ name: u, type: 'url' }))
+  return [...fileItems, ...urlItems]
 })
 
 // 触发文件选择
@@ -272,18 +310,74 @@ const handleDrop = (e) => {
   addFiles(droppedFiles)
 }
 
+// 获取文件图标
+const getFileIcon = (fileName) => {
+  const ext = fileName.split('.').pop().toLowerCase()
+  const icons = {
+    'pdf': '📄', 'md': '📝', 'txt': '📋',
+    'xls': '📊', 'xlsx': '📊',
+    'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 
+    'gif': '🖼️', 'bmp': '🖼️', 'webp': '🖼️'
+  }
+  return icons[ext] || '📎'
+}
+
 // 添加文件
 const addFiles = (newFiles) => {
+  const validExts = ['pdf', 'md', 'txt', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
   const validFiles = newFiles.filter(file => {
     const ext = file.name.split('.').pop().toLowerCase()
-    return ['pdf', 'md', 'txt'].includes(ext)
+    return validExts.includes(ext)
   })
   files.value.push(...validFiles)
 }
 
-// 移除文件
+// Paste handler for images
+const handlePaste = async (event) => {
+  const items = event.clipboardData?.items
+  if (!items) return
+  
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].kind === 'file') {
+      const file = items[i].getAsFile()
+      if (file && file.type.startsWith('image/')) {
+        addFiles([file])
+      }
+    }
+  }
+}
+
+// Add URL
+const addUrl = () => {
+  const url = formData.value.urlInput.trim()
+  if (!url) return
+  
+  // Validate URL if starts with http/https
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      new URL(url)
+      urls.value.push(url)
+    } catch {
+      alert('Invalid URL. Make sure it starts with http:// or https://')
+      return
+    }
+  } else {
+    // Allow free text as source reference
+    urls.value.push(url)
+  }
+  
+  formData.value.urlInput = ''
+}
+
+// 移除文件或 URL
 const removeFile = (index) => {
-  files.value.splice(index, 1)
+  const item = displayItems.value[index]
+  if (item.type === 'url') {
+    const urlIndex = urls.value.indexOf(item.name)
+    if (urlIndex > -1) urls.value.splice(urlIndex, 1)
+  } else {
+    files.value.splice(index, 1)
+  }
 }
 
 // 滚动到底部
@@ -740,6 +834,78 @@ const startSimulation = () => {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: #999;
+}
+
+.upload-examples {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #BBB;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+.upload-url-hint {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #BBB;
+  margin-top: 8px;
+}
+
+/* URL Input Styling */
+.url-input-wrapper {
+  display: flex;
+  gap: 10px;
+  border: 1px solid #DDD;
+  background: #FAFAFA;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.url-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.url-input:focus {
+  background: rgba(255, 69, 0, 0.05);
+}
+
+.url-input::placeholder {
+  color: #999;
+}
+
+.url-add-btn {
+  background: var(--orange);
+  color: var(--white);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.url-add-btn:hover:not(:disabled) {
+  background: #ff6b35;
+  transform: translateY(-1px);
+}
+
+.url-add-btn:disabled {
+  background: #DDD;
+  color: #999;
+  cursor: not-allowed;
+}
+
+/* URL Item Styling */
+.file-item.url-item {
+  background: rgba(255, 69, 0, 0.05);
+  border: 1px solid rgba(255, 69, 0, 0.2);
 }
 
 .file-list {
