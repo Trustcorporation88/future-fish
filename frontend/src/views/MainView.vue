@@ -193,9 +193,12 @@ const initProject = async () => {
 
 const handleNewProject = async () => {
   const pending = getPendingUpload()
-  if (!pending.isPending || pending.files.length === 0) {
-    error.value = 'No pending files found.'
-    addLog('Error: No pending files found for new project.')
+  const hasFiles = pending.files && pending.files.length > 0
+  const hasMarketContext = pending.marketContext && pending.marketContext.trim().length > 0
+
+  if (!pending.isPending || (!hasFiles && !hasMarketContext)) {
+    error.value = 'Nenhum arquivo, link, notícia ou cotação pendente.'
+    addLog('Erro: nenhum material pendente encontrado para o novo projeto.')
     return
   }
   
@@ -207,6 +210,14 @@ const handleNewProject = async () => {
     
     const formData = new FormData()
     pending.files.forEach(f => formData.append('files', f))
+    if (hasMarketContext) {
+      const marketFile = new File(
+        [pending.marketContext],
+        'noticias-cotacoes-e-fontes.txt',
+        { type: 'text/plain' }
+      )
+      formData.append('files', marketFile)
+    }
     formData.append('simulation_requirement', pending.simulationRequirement)
     
     const res = await generateOntology(formData)

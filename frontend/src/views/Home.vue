@@ -16,25 +16,21 @@
       <section class="hero-section">
         <div class="hero-left">
           <div class="tag-row">
-            <span class="orange-tag">{{ $t('home.tagline') }}</span>
-            <span class="version-text">{{ $t('home.version') }}</span>
+            <span class="orange-tag">PREVISÃO FINANCEIRA</span>
+            <span class="version-text">notícias + cotações + documentos</span>
           </div>
           
           <h1 class="main-title">
-            {{ $t('home.heroTitle1') }}<br>
-            <span class="gradient-text">{{ $t('home.heroTitle2') }}</span>
+            Future Fish<br>
+            <span class="gradient-text">previsões de mercado</span>
           </h1>
           
           <div class="hero-desc">
             <p>
-              <i18n-t keypath="home.heroDesc" tag="span">
-                <template #brand><span class="highlight-bold">{{ $t('home.heroDescBrand') }}</span></template>
-                <template #agentScale><span class="highlight-orange">{{ $t('home.heroDescAgentScale') }}</span></template>
-                <template #optimalSolution><span class="highlight-code">{{ $t('home.heroDescOptimalSolution') }}</span></template>
-              </i18n-t>
+              Use notícias atualizadas, cotações em tempo real, documentos, links e imagens para gerar previsões de eventos financeiros.
             </p>
             <p class="slogan-text">
-              {{ $t('home.slogan') }}<span class="blinking-cursor">_</span>
+              Analise IBOVESPA, dólar, S&P 500, Dow Jones, Brent, ouro e Bitcoin<span class="blinking-cursor">_</span>
             </p>
           </div>
            
@@ -58,65 +54,101 @@
         <!-- 左栏：状态与步骤 -->
         <div class="left-panel">
           <div class="panel-header">
-            <span class="status-dot">■</span> {{ $t('home.systemStatus') }}
+            <span class="status-dot">■</span> Estado do sistema
           </div>
           
-          <h2 class="section-title">{{ $t('home.systemReady') }}</h2>
+          <h2 class="section-title">Preparar previsão</h2>
           <p class="section-desc">
-            {{ $t('home.systemReadyDesc') }}
+            Carregue notícias, cotações, documentos, links ou imagens para iniciar uma simulação de mercado.
           </p>
           
           <!-- 数据指标卡片 -->
           <div class="metrics-row">
             <div class="metric-card">
-              <div class="metric-value">{{ $t('home.metricLowCost') }}</div>
-              <div class="metric-label">{{ $t('home.metricLowCostDesc') }}</div>
+              <div class="metric-value">Notícias</div>
+              <div class="metric-label">Feeds RSS atualizados de fontes reais.</div>
             </div>
             <div class="metric-card">
-              <div class="metric-value">{{ $t('home.metricHighAvail') }}</div>
-              <div class="metric-label">{{ $t('home.metricHighAvailDesc') }}</div>
+              <div class="metric-value">Cotações</div>
+              <div class="metric-label">Índices, dólar, petróleo, ouro e Bitcoin.</div>
+            </div>
+          </div>
+
+          <div class="market-panel">
+            <div class="market-header">
+              <span>◇ Cotações em tempo real</span>
+              <button class="refresh-btn" @click="loadMarketData" :disabled="marketLoading">
+                {{ marketLoading ? 'Atualizando...' : 'Atualizar' }}
+              </button>
+            </div>
+            <div v-if="quotes.length" class="quotes-grid">
+              <div v-for="quote in quotes" :key="quote.key" class="quote-card">
+                <div class="quote-name">{{ quote.name }}</div>
+                <div class="quote-price">{{ formatQuotePrice(quote) }}</div>
+                <div class="quote-change" :class="{ positive: Number(quote.change_percent) >= 0, negative: Number(quote.change_percent) < 0 }">
+                  {{ formatPercent(quote.change_percent) }}
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-market">
+              Nenhuma cotação carregada ainda. Clique em “Atualizar”.
+            </div>
+          </div>
+
+          <div class="market-panel">
+            <div class="market-header">
+              <span>◇ Notícias atualizadas</span>
+            </div>
+            <div v-if="news.length" class="news-list">
+              <a v-for="article in news" :key="article.link || article.title" class="news-item" :href="article.link" target="_blank">
+                <span class="news-source">{{ article.source }}</span>
+                <span class="news-title">{{ article.title }}</span>
+              </a>
+            </div>
+            <div v-else class="empty-market">
+              Nenhuma notícia carregada ainda. Clique em “Atualizar”.
             </div>
           </div>
 
           <!-- 项目模拟步骤介绍 (新增区域) -->
           <div class="steps-container">
             <div class="steps-header">
-               <span class="diamond-icon">◇</span> {{ $t('home.workflowSequence') }}
+               <span class="diamond-icon">◇</span> Sequência de previsão
             </div>
             <div class="workflow-list">
               <div class="workflow-item">
                 <span class="step-num">01</span>
                 <div class="step-info">
-                  <div class="step-title">{{ $t('home.step01Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step01Desc') }}</div>
+                  <div class="step-title">Carregar material</div>
+                  <div class="step-desc">Adicione notícias, documentos, links, planilhas ou imagens.</div>
                 </div>
               </div>
               <div class="workflow-item">
                 <span class="step-num">02</span>
                 <div class="step-info">
-                  <div class="step-title">{{ $t('home.step02Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step02Desc') }}</div>
+                  <div class="step-title">Gerar contexto</div>
+                  <div class="step-desc">O sistema organiza fontes, cotações e eventos relevantes.</div>
                 </div>
               </div>
               <div class="workflow-item">
                 <span class="step-num">03</span>
                 <div class="step-info">
-                  <div class="step-title">{{ $t('home.step03Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step03Desc') }}</div>
+                  <div class="step-title">Construir grafo</div>
+                  <div class="step-desc">Entidades, relações e sinais de mercado são conectados.</div>
                 </div>
               </div>
               <div class="workflow-item">
                 <span class="step-num">04</span>
                 <div class="step-info">
-                  <div class="step-title">{{ $t('home.step04Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step04Desc') }}</div>
+                  <div class="step-title">Simular cenários</div>
+                  <div class="step-desc">Agentes analisam possíveis impactos e desdobramentos.</div>
                 </div>
               </div>
               <div class="workflow-item">
                 <span class="step-num">05</span>
                 <div class="step-info">
-                  <div class="step-title">{{ $t('home.step05Title') }}</div>
-                  <div class="step-desc">{{ $t('home.step05Desc') }}</div>
+                  <div class="step-title">Gerar relatório</div>
+                  <div class="step-desc">Receba uma análise final com premissas e sinais de risco.</div>
                 </div>
               </div>
             </div>
@@ -129,8 +161,8 @@
             <!-- 上传区域 -->
             <div class="console-section">
               <div class="console-header">
-                <span class="console-label">{{ $t('home.eventDocuments') || 'EVENT DOCUMENTS' }}</span>
-                <span class="console-meta">{{ $t('home.supportedFormats') }}</span>
+                <span class="console-label">DOCUMENTOS, PLANILHAS E IMAGENS</span>
+                <span class="console-meta">PDF, MD, TXT, XLS, JPG, PNG</span>
               </div>
               
               <div 
@@ -154,8 +186,8 @@
                 
                 <div v-if="files.length === 0 && urls.length === 0" class="upload-placeholder">
                   <div class="upload-icon">📑</div>
-                  <div class="upload-title">{{ $t('home.dragToUpload') }}</div>
-                  <div class="upload-hint">{{ $t('home.orBrowse') }}</div>
+                  <div class="upload-title">Arraste arquivos ou clique para selecionar</div>
+                  <div class="upload-hint">PDF, MD, TXT, XLS, JPG ou PNG</div>
                   <div class="upload-examples">PDF, MD, TXT, XLS, JPG, PNG ou cole imagens aqui</div>
                   <div class="upload-url-hint">Ou adicione um link abaixo ↓</div>
                 </div>
@@ -170,10 +202,30 @@
               </div>
             </div>
 
+            <!-- Área explícita para colar imagem -->
+            <div class="console-section">
+              <div class="console-header">
+                <span class="console-label">COLAR IMAGEM</span>
+              </div>
+              <div
+                class="paste-image-box"
+                tabindex="0"
+                @paste.prevent="handlePaste"
+                @click="focusPasteBox"
+                ref="pasteBox"
+              >
+                <div class="paste-icon">🖼️</div>
+                <div>
+                  <strong>Clique aqui e pressione Ctrl+V</strong>
+                  <p>Cole print, foto ou imagem copiada da área de transferência.</p>
+                </div>
+              </div>
+            </div>
+
             <!-- URL 输入区域 -->
             <div class="console-section">
               <div class="console-header">
-                <span class="console-label">{{ $t('home.addUrl') || 'ADD LINK/URL' }}</span>
+                <span class="console-label">ADICIONAR LINK / URL / FONTE</span>
               </div>
               <div class="url-input-wrapper">
                 <input
@@ -189,30 +241,30 @@
                   class="url-add-btn"
                   :disabled="loading || !formData.urlInput.trim()"
                 >
-                  ✓ Add
+                  ✓ Adicionar
                 </button>
               </div>
             </div>
 
             <!-- 分割线 -->
             <div class="console-divider">
-              <span>{{ $t('home.inputParams') }}</span>
+              <span>PARÂMETROS DA PREVISÃO</span>
             </div>
 
             <!-- 输入区域 -->
             <div class="console-section">
               <div class="console-header">
-                <span class="console-label">{{ $t('home.simulationPrompt') }}</span>
+                <span class="console-label">O que você quer prever?</span>
               </div>
               <div class="input-wrapper">
                 <textarea
                   v-model="formData.simulationRequirement"
                   class="code-input"
-                  :placeholder="$t('home.promptPlaceholder')"
+                  placeholder="Exemplo: Analise o impacto das notícias e cotações de hoje no IBOVESPA, dólar, petróleo e Bitcoin para as próximas 24 horas."
                   rows="6"
                   :disabled="loading"
                 ></textarea>
-                <div class="model-badge">{{ $t('home.engineBadge') }}</div>
+                <div class="model-badge">motor de previsão</div>
               </div>
             </div>
 
@@ -223,8 +275,8 @@
                 @click="startSimulation"
                 :disabled="!canSubmit || loading"
               >
-                <span v-if="!loading">{{ $t('home.startEngine') }}</span>
-                <span v-else>{{ $t('home.initializing') }}</span>
+                <span v-if="!loading">Iniciar previsão</span>
+                <span v-else>Inicializando...</span>
                 <span class="btn-arrow">→</span>
               </button>
             </div>
@@ -239,7 +291,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
@@ -260,14 +312,18 @@ const urls = ref([])
 const loading = ref(false)
 const error = ref('')
 const isDragOver = ref(false)
+const marketLoading = ref(false)
+const quotes = ref([])
+const news = ref([])
 
 // 文件输入引用
 const fileInput = ref(null)
+const pasteBox = ref(null)
 
 // 计算属性:是否可以提交
 const canSubmit = computed(() => {
   const hasRequirement = formData.value.simulationRequirement.trim() !== ''
-  const hasInput = files.value.length > 0 || urls.value.length > 0
+  const hasInput = files.value.length > 0 || urls.value.length > 0 || quotes.value.length > 0 || news.value.length > 0
   return hasRequirement && hasInput
 })
 
@@ -332,6 +388,10 @@ const addFiles = (newFiles) => {
   files.value.push(...validFiles)
 }
 
+const focusPasteBox = () => {
+  pasteBox.value?.focus()
+}
+
 // Paste handler for images
 const handlePaste = async (event) => {
   const items = event.clipboardData?.items
@@ -358,7 +418,7 @@ const addUrl = () => {
       new URL(url)
       urls.value.push(url)
     } catch {
-      alert('Invalid URL. Make sure it starts with http:// or https://')
+      alert('URL inválida. Verifique se começa com http:// ou https://')
       return
     }
   } else {
@@ -367,6 +427,73 @@ const addUrl = () => {
   }
   
   formData.value.urlInput = ''
+}
+
+const loadMarketData = async () => {
+  marketLoading.value = true
+  try {
+    const [quotesResponse, newsResponse] = await Promise.all([
+      fetch('/api/quotes/list'),
+      fetch('/api/news/list?limit=8&category=market')
+    ])
+
+    const quotesData = await quotesResponse.json()
+    const newsData = await newsResponse.json()
+
+    if (quotesData.success) {
+      quotes.value = quotesData.data.quotes || []
+    }
+
+    if (newsData.success) {
+      news.value = newsData.data.articles || []
+    }
+  } catch (err) {
+    console.error('Erro ao carregar notícias e cotações:', err)
+  } finally {
+    marketLoading.value = false
+  }
+}
+
+const formatQuotePrice = (quote) => {
+  if (quote.price === null || quote.price === undefined) return '-'
+  const currency = quote.currency === 'BRL' ? 'BRL' : 'USD'
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: quote.type === 'crypto' ? 0 : 2
+  }).format(Number(quote.price))
+}
+
+const formatPercent = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '0,00%'
+  const number = Number(value)
+  const prefix = number > 0 ? '+' : ''
+  return `${prefix}${number.toFixed(2).replace('.', ',')}%`
+}
+
+const buildMarketContext = () => {
+  const quoteLines = quotes.value.map(quote => {
+    return `${quote.name}: ${formatQuotePrice(quote)} (${formatPercent(quote.change_percent)})`
+  })
+
+  const newsLines = news.value.map(article => {
+    return `${article.source}: ${article.title}${article.link ? ` - ${article.link}` : ''}`
+  })
+
+  const urlLines = urls.value.map(url => `Fonte informada pelo usuário: ${url}`)
+
+  return [
+    'DADOS AUTOMÁTICOS PARA A PREVISÃO',
+    '',
+    'COTAÇÕES:',
+    ...(quoteLines.length ? quoteLines : ['Nenhuma cotação carregada.']),
+    '',
+    'NOTÍCIAS:',
+    ...(newsLines.length ? newsLines : ['Nenhuma notícia carregada.']),
+    '',
+    'LINKS/FONTES ADICIONADAS:',
+    ...(urlLines.length ? urlLines : ['Nenhum link/fonte adicionada.'])
+  ].join('\n')
 }
 
 // 移除文件或 URL
@@ -394,7 +521,12 @@ const startSimulation = () => {
   
   // 存储待上传的数据
   import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
-    setPendingUpload(files.value, formData.value.simulationRequirement)
+    setPendingUpload(files.value, formData.value.simulationRequirement, {
+      urls: urls.value,
+      quotes: quotes.value,
+      news: news.value,
+      marketContext: buildMarketContext()
+    })
     
     // 立即跳转到Process页面（使用特殊标识表示新建项目）
     router.push({
@@ -403,6 +535,10 @@ const startSimulation = () => {
     })
   })
 }
+
+onMounted(() => {
+  loadMarketData()
+})
 </script>
 
 <style scoped>
@@ -705,6 +841,121 @@ const startSimulation = () => {
   color: #999;
 }
 
+.market-panel {
+  border: 1px solid var(--border);
+  padding: 18px;
+  margin-bottom: 16px;
+  background: #FAFAFA;
+}
+
+.market-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: #333;
+  margin-bottom: 14px;
+}
+
+.refresh-btn {
+  border: 1px solid #DDD;
+  background: var(--white);
+  color: var(--black);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quotes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quote-card {
+  border: 1px solid #EEE;
+  background: var(--white);
+  padding: 10px;
+}
+
+.quote-name {
+  font-size: 0.78rem;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.quote-price {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.quote-change {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin-top: 5px;
+}
+
+.quote-change.positive {
+  color: #16833a;
+}
+
+.quote-change.negative {
+  color: #c62828;
+}
+
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.news-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid #EEE;
+  background: var(--white);
+  padding: 10px;
+  text-decoration: none;
+  color: var(--black);
+}
+
+.news-item:hover {
+  border-color: var(--orange);
+}
+
+.news-source {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--orange);
+}
+
+.news-title {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.empty-market {
+  color: #999;
+  font-size: 0.82rem;
+}
+
 /* 项目模拟步骤介绍 */
 .steps-container {
   border: 1px solid var(--border);
@@ -849,6 +1100,37 @@ const startSimulation = () => {
   font-size: 0.7rem;
   color: #BBB;
   margin-top: 8px;
+}
+
+.paste-image-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 2px dashed var(--orange);
+  background: rgba(255, 69, 0, 0.06);
+  padding: 18px;
+  cursor: text;
+  outline: none;
+}
+
+.paste-image-box:focus {
+  box-shadow: 0 0 0 3px rgba(255, 69, 0, 0.16);
+}
+
+.paste-icon {
+  font-size: 2rem;
+}
+
+.paste-image-box strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.paste-image-box p {
+  margin: 0;
+  color: #777;
+  font-size: 0.82rem;
 }
 
 /* URL Input Styling */
