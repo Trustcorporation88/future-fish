@@ -33,3 +33,9 @@ python-dotenv>=1.0.0
 
 # 数据验证
 pydantic>=2.0.0
+
+# ============= News & Quotes =============
+# RSS feed parser
+feedparser>=6.0.0
+# HTTP requests
+requests>=2.31.0
