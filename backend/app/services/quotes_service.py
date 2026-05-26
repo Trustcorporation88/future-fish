@@ -3,8 +3,9 @@ Quotes Service - Fetches real-time stock prices, commodities, and crypto prices
 Uses Finnhub API, BRAPI for Brazilian stocks, and cryptocurrency APIs
 """
 
-import requests
 import os
+import requests
+from urllib.parse import quote
 from datetime import datetime
 from typing import List, Dict, Optional
 from ..utils.logger import get_logger
@@ -20,52 +21,52 @@ class QuotesService:
     
     # Quote symbols mapping
     QUOTES = {
-        'ibovespa': {
-            'symbol': '^BVSP',
-            'name': 'IBOVESPA',
-            'source': 'brapi',
-            'type': 'index',
-            'currency': 'BRL'
-        },
         'sp500': {
             'symbol': '^GSPC',
             'name': 'S&P 500',
-            'source': 'finnhub',
+            'source': 'yahoo',
             'type': 'index',
             'currency': 'USD'
         },
         'dowjones': {
             'symbol': '^DJI',
             'name': 'Dow Jones',
-            'source': 'finnhub',
+            'source': 'yahoo',
             'type': 'index',
             'currency': 'USD'
         },
+        'ibovespa': {
+            'symbol': '^BVSP',
+            'name': 'IBOVESPA',
+            'source': 'yahoo',
+            'type': 'index',
+            'currency': 'BRL'
+        },
         'dolar': {
-            'symbol': 'USDBRL=X',
+            'symbol': 'BRL=X',
             'name': 'Dólar/Real',
-            'source': 'brapi',
+            'source': 'yahoo',
             'type': 'currency',
             'currency': 'BRL'
         },
         'brent': {
-            'symbol': 'BRENT',
+            'symbol': 'BZ=F',
             'name': 'Petróleo Brent',
-            'source': 'finnhub',
+            'source': 'yahoo',
             'type': 'commodity',
             'currency': 'USD'
         },
         'ouro': {
-            'symbol': 'XAUUSD',
+            'symbol': 'GC=F',
             'name': 'Ouro (USD/onça)',
-            'source': 'finnhub',
+            'source': 'yahoo',
             'type': 'commodity',
             'currency': 'USD'
         },
         'bitcoin': {
-            'symbol': 'CRYPTO_BTC',
+            'symbol': 'BTC-USD',
             'name': 'Bitcoin',
-            'source': 'crypto',
+            'source': 'yahoo',
             'type': 'crypto',
             'currency': 'USD'
         }
@@ -90,7 +91,9 @@ class QuotesService:
         source = quote_info['source']
         
         try:
-            if source == 'finnhub':
+            if source == 'yahoo':
+                return QuotesService._fetch_yahoo_quote(quote_key, quote_info)
+            elif source == 'finnhub':
                 return QuotesService._fetch_finnhub_quote(quote_info)
             elif source == 'brapi':
                 return QuotesService._fetch_brapi_quote(quote_info)
@@ -112,6 +115,75 @@ class QuotesService:
             if quote:
                 quotes.append(quote)
         return quotes
+
+    @staticmethod
+    def _fetch_yahoo_quote(quote_key: str, quote_info: Dict) -> Optional[Dict]:
+        """Fetch quote from Yahoo Finance chart endpoint (no API key required)."""
+        try:
+            encoded_symbol = quote(quote_info['symbol'], safe='')
+            url = f'https://query1.finance.yahoo.com/v8/finance/chart/{encoded_symbol}'
+            params = {
+                'range': '1d',
+                'interval': '1m'
+            }
+            headers = {
+                'User-Agent': 'Mozilla/5.0'
+            }
+
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            result = data.get('chart', {}).get('result') or []
+            if not result:
+                logger.warning(f"No Yahoo Finance data for {quote_info['symbol']}")
+                return None
+
+            chart = result[0]
+            meta = chart.get('meta', {})
+            indicators = chart.get('indicators', {}).get('quote') or [{}]
+            quote_values = indicators[0]
+
+            price = meta.get('regularMarketPrice')
+            previous_close = meta.get('chartPreviousClose') or meta.get('previousClose')
+            high_values = [v for v in quote_values.get('high', []) if v is not None]
+            low_values = [v for v in quote_values.get('low', []) if v is not None]
+            open_values = [v for v in quote_values.get('open', []) if v is not None]
+
+            if price is None:
+                close_values = chart.get('indicators', {}).get('quote', [{}])[0].get('close', [])
+                valid_close = [v for v in close_values if v is not None]
+                price = valid_close[-1] if valid_close else None
+
+            if price is None:
+                logger.warning(f"No current price for {quote_info['symbol']}")
+                return None
+
+            change = None
+            change_percent = None
+            if previous_close:
+                change = price - previous_close
+                change_percent = (change / previous_close) * 100
+
+            return {
+                'key': quote_key,
+                'symbol': quote_info['symbol'],
+                'name': quote_info['name'],
+                'price': price,
+                'high': max(high_values) if high_values else None,
+                'low': min(low_values) if low_values else None,
+                'open': open_values[0] if open_values else None,
+                'previous_close': previous_close,
+                'change': change,
+                'change_percent': change_percent,
+                'timestamp': datetime.now().isoformat(),
+                'source': 'yahoo',
+                'type': quote_info['type'],
+                'currency': quote_info['currency']
+            }
+        except Exception as e:
+            logger.error(f"Yahoo Finance error for {quote_info['symbol']}: {str(e)}")
+            return None
     
     @staticmethod
     def _fetch_finnhub_quote(quote_info: Dict) -> Optional[Dict]:

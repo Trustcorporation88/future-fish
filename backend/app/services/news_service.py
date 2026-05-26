@@ -5,7 +5,8 @@ Supports BBC Brasil, CNN Brasil, Bloomberg, Jovem Pan, Agência Brasil, etc.
 
 import feedparser
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 from typing import List, Dict, Optional
 from ..utils.logger import get_logger
 
@@ -17,12 +18,12 @@ class NewsService:
     # RSS Feed URLs for Brazilian and international sources
     NEWS_SOURCES = {
         'bbc_brasil': {
-            'url': 'http://feeds.bbc.co.uk/mundo/rss.xml',
+            'url': 'https://feeds.bbci.co.uk/portuguese/rss.xml',
             'name': 'BBC Brasil',
             'language': 'pt-BR'
         },
         'cnn_brasil': {
-            'url': 'https://www.cnnbrasil.com.br/feed/rss.xml',
+            'url': 'https://www.cnnbrasil.com.br/feed/',
             'name': 'CNN Brasil',
             'language': 'pt-BR'
         },
@@ -32,12 +33,12 @@ class NewsService:
             'language': 'en'
         },
         'jovem_pan': {
-            'url': 'https://www.jovempan.com.br/feed.xml',
+            'url': 'https://jovempan.com.br/feed/',
             'name': 'Jovem Pan News',
             'language': 'pt-BR'
         },
         'agencia_brasil': {
-            'url': 'https://agenciabrasil.ebc.com.br/feed.xml',
+            'url': 'https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml',
             'name': 'Agência Brasil',
             'language': 'pt-BR'
         },
@@ -50,13 +51,56 @@ class NewsService:
             'url': 'https://g1.globo.com/rss/g1/economia/',
             'name': 'G1 - Economia',
             'language': 'pt-BR'
-        },
-        'reuters': {
-            'url': 'https://www.reuters.com/finance/markets',
-            'name': 'Reuters - Markets',
-            'language': 'en'
         }
     }
+
+    @staticmethod
+    def _parse_feed(url: str):
+        """Fetch and parse RSS with headers to avoid common 403/empty responses."""
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; MiroFish/1.0; +https://github.com/Trustcorporation88/future-fish)'
+        }
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            return feedparser.parse(response.content)
+        except Exception as e:
+            logger.warning(f"Direct RSS request failed for {url}: {str(e)}; trying feedparser directly")
+            return feedparser.parse(url)
+
+    @staticmethod
+    def _entry_datetime(entry) -> datetime:
+        """Parse feed entry published date from multiple RSS/Atom formats."""
+        parsed_time = entry.get('published_parsed') or entry.get('updated_parsed')
+        if parsed_time:
+            return datetime(*parsed_time[:6])
+
+        date_text = entry.get('published') or entry.get('updated') or ''
+        if date_text:
+            try:
+                return parsedate_to_datetime(date_text).replace(tzinfo=None)
+            except Exception:
+                try:
+                    return datetime.fromisoformat(date_text.replace('Z', '+00:00')).replace(tzinfo=None)
+                except Exception:
+                    pass
+
+        return datetime.now()
+
+    @staticmethod
+    def _article_from_entry(entry, source_key: str, source_info: Dict, category: str = 'general') -> Dict:
+        published_at = NewsService._entry_datetime(entry)
+        return {
+            'source': source_info['name'],
+            'source_key': source_key,
+            'title': entry.get('title', 'Sem título'),
+            'link': entry.get('link', ''),
+            'summary': entry.get('summary', entry.get('description', ''))[:300],
+            'published': published_at.isoformat(),
+            'published_ts': published_at.timestamp(),
+            'language': source_info['language'],
+            'category': category
+        }
     
     @staticmethod
     def fetch_news(source: Optional[str] = None, limit: int = 10) -> List[Dict]:
@@ -77,69 +121,41 @@ class NewsService:
         for source_key, source_info in sources_to_fetch.items():
             try:
                 logger.info(f"Fetching news from {source_info['name']}...")
-                feed = feedparser.parse(source_info['url'])
+                feed = NewsService._parse_feed(source_info['url'])
                 
-                if feed.status != 200 and feed.bozo:
+                if getattr(feed, 'bozo', False):
                     logger.warning(f"Feed parsing warning for {source_info['name']}: {feed.bozo_exception}")
                 
                 for entry in feed.entries[:limit]:
-                    article = {
-                        'source': source_info['name'],
-                        'source_key': source_key,
-                        'title': entry.get('title', 'N/A'),
-                        'link': entry.get('link', ''),
-                        'summary': entry.get('summary', '')[:300],  # First 300 chars
-                        'published': entry.get('published', datetime.now().isoformat()),
-                        'language': source_info['language']
-                    }
-                    articles.append(article)
+                    articles.append(NewsService._article_from_entry(entry, source_key, source_info))
                     
             except Exception as e:
                 logger.error(f"Error fetching news from {source_info['name']}: {str(e)}")
                 continue
         
         # Sort by published date (most recent first)
-        articles.sort(
-            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
-            reverse=True
-        )
+        articles.sort(key=lambda x: x.get('published_ts', 0), reverse=True)
         
         return articles[:limit * len(sources_to_fetch) if not source else limit]
     
     @staticmethod
     def fetch_market_news(limit: int = 10) -> List[Dict]:
         """Fetch only market/financial news"""
-        market_sources = {
-            k: v for k, v in NewsService.NEWS_SOURCES.items()
-            if any(keyword in k.lower() for keyword in ['folha', 'bloomberg', 'g1_economia'])
-        }
+        market_sources = NewsService.NEWS_SOURCES
         
         articles = []
         for source_key, source_info in market_sources.items():
             try:
-                feed = feedparser.parse(source_info['url'])
+                feed = NewsService._parse_feed(source_info['url'])
                 
                 for entry in feed.entries[:limit]:
-                    article = {
-                        'source': source_info['name'],
-                        'source_key': source_key,
-                        'title': entry.get('title', 'N/A'),
-                        'link': entry.get('link', ''),
-                        'summary': entry.get('summary', '')[:300],
-                        'published': entry.get('published', datetime.now().isoformat()),
-                        'language': source_info['language'],
-                        'category': 'market'
-                    }
-                    articles.append(article)
+                    articles.append(NewsService._article_from_entry(entry, source_key, source_info, category='market'))
                     
             except Exception as e:
                 logger.error(f"Error fetching market news from {source_info['name']}: {str(e)}")
                 continue
         
-        articles.sort(
-            key=lambda x: datetime.fromisoformat(x['published'].replace('Z', '+00:00')),
-            reverse=True
-        )
+        articles.sort(key=lambda x: x.get('published_ts', 0), reverse=True)
         
         return articles[:limit]
     
