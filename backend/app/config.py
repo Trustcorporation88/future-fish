@@ -45,6 +45,10 @@ class Config:
     
     # Zep配置
     ZEP_API_KEY = _env_value('ZEP_API_KEY')
+
+    # Market data配置
+    FINNHUB_API_KEY = _env_value('FINNHUB_API_KEY', '')
+    BRAPI_TOKEN = _env_value('BRAPI_TOKEN', '')
     
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
