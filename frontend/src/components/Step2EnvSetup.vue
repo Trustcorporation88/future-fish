@@ -637,6 +637,7 @@ import { useI18n } from 'vue-i18n'
 import {
   prepareSimulation,
   getPrepareStatus,
+  getSimulation,
   getSimulationProfilesRealtime,
   getSimulationConfig,
   getSimulationConfigRealtime
@@ -769,11 +770,26 @@ const selectProfile = (profile) => {
 }
 
 // 自动开始准备模拟
-const startPrepareSimulation = async () => {
+const startPrepareSimulation = async (force = false) => {
   if (!props.simulationId) {
     addLog(t('log.errorMissingSimId'))
     emit('update-status', 'error')
     return
+  }
+
+  // Detect previously failed prepare (UI was stuck on "Preparing")
+  try {
+    const simRes = await getSimulation(props.simulationId)
+    if (simRes.success && simRes.data?.status === 'failed') {
+      addLog(`Preparação anterior falhou: ${simRes.data.error || t('common.unknownError')}`)
+      if (!force) {
+        emit('update-status', 'error')
+        return
+      }
+      addLog('Reiniciando preparação (force_regenerate)...')
+    }
+  } catch {
+    /* ignore */
   }
   
   // 标记第一步完成，开始第二步
@@ -786,7 +802,8 @@ const startPrepareSimulation = async () => {
     const res = await prepareSimulation({
       simulation_id: props.simulationId,
       use_llm_for_profiles: true,
-      parallel_profile_count: 5
+      parallel_profile_count: 5,
+      force_regenerate: force,
     })
     
     if (res.success && res.data) {
@@ -898,9 +915,20 @@ const pollPrepareStatus = async () => {
         stopProfilesPolling()
         await loadPreparedData()
       } else if (data.status === 'failed') {
-        addLog(t('log.prepareFailedWithError', { error: data.error || t('common.unknownError') }))
+        addLog(t('log.prepareFailedWithError', { error: data.error || data.message || t('common.unknownError') }))
         stopPolling()
         stopProfilesPolling()
+        stopConfigPolling()
+        emit('update-status', 'error')
+      }
+    } else if (!res.success && props.simulationId) {
+      const simRes = await getSimulation(props.simulationId)
+      if (simRes.success && simRes.data?.status === 'failed') {
+        addLog(t('log.prepareFailedWithError', { error: simRes.data.error || t('common.unknownError') }))
+        stopPolling()
+        stopProfilesPolling()
+        stopConfigPolling()
+        emit('update-status', 'error')
       }
     }
   } catch (err) {
@@ -1068,10 +1096,23 @@ watch(() => props.systemLogs?.length, () => {
   })
 })
 
-onMounted(() => {
-  // 自动开始准备流程
+onMounted(async () => {
   if (props.simulationId) {
     addLog(t('log.step2Init'))
+    try {
+      const simRes = await getSimulation(props.simulationId)
+      if (simRes.success && simRes.data?.status === 'ready') {
+        await loadPreparedData()
+        return
+      }
+      if (simRes.success && simRes.data?.status === 'failed') {
+        addLog(`Simulação em estado failed — clique em voltar e inicie cenário novo, ou recarregue após deploy.`)
+        emit('update-status', 'error')
+        return
+      }
+    } catch {
+      /* continue with prepare */
+    }
     startPrepareSimulation()
   }
 })

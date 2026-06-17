@@ -361,6 +361,13 @@ def build_graph():
                 "success": False,
                 "error": t('api.textNotFound')
             }), 400
+
+        # Include simulation requirement so Zep extracts match/team entities (Copa Bets)
+        if project.simulation_requirement:
+            text = (
+                f"=== CENÁRIO DE SIMULAÇÃO ===\n{project.simulation_requirement}\n\n"
+                f"=== DOCUMENTOS E FONTES ===\n{text}"
+            )
         
         # 获取本体
         ontology = project.ontology

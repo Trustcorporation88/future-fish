@@ -77,9 +77,14 @@
           <div class="market-panel">
             <div class="market-header">
               <span>◇ Cotações em tempo real</span>
-              <button class="refresh-btn" @click="loadMarketData" :disabled="marketLoading">
-                {{ marketLoading ? 'Atualizando...' : 'Atualizar' }}
-              </button>
+              <div class="market-header-actions">
+                <span v-if="isCopaBetsImport && marketUpdatedAt" class="market-updated">
+                  Atualizado {{ formatMarketUpdated(marketUpdatedAt) }}
+                </span>
+                <button class="refresh-btn" @click="loadMarketData" :disabled="marketLoading">
+                  {{ marketLoading ? 'Atualizando...' : 'Atualizar' }}
+                </button>
+              </div>
             </div>
             <div v-if="quotes.length" class="quotes-grid">
               <div v-for="quote in quotes" :key="quote.key" class="quote-card">
@@ -294,7 +299,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
@@ -317,6 +322,7 @@ const loading = ref(false)
 const error = ref('')
 const isDragOver = ref(false)
 const marketLoading = ref(false)
+const marketUpdatedAt = ref('')
 const quotes = ref([])
 const news = ref([])
 const isCopaBetsImport = ref(false)
@@ -458,6 +464,7 @@ const loadMarketData = async () => {
     if (newsData.success) {
       news.value = newsData.data.articles || []
     }
+    marketUpdatedAt.value = new Date().toISOString()
   } catch (err) {
     console.error('Erro ao carregar notícias e cotações:', err)
   } finally {
@@ -480,6 +487,15 @@ const formatPercent = (value) => {
   const number = Number(value)
   const prefix = number > 0 ? '+' : ''
   return `${prefix}${number.toFixed(2).replace('.', ',')}%`
+}
+
+const formatMarketUpdated = (iso) => {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000)
+  if (diffSec < 60) return 'há menos de 1 min'
+  if (diffSec < 3600) return `há ${Math.floor(diffSec / 60)} min`
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 const buildMarketContext = () => {
@@ -588,7 +604,9 @@ const applyCopaBetsDeepLink = () => {
       urls.value.push(sourceRef)
     }
     copaImportBanner.value =
-      'Contexto importado do Copa Bets. Revise o prompt abaixo e clique em Iniciar previsão.'
+      route.query.live === '1'
+        ? 'Contexto AO VIVO importado do Copa Bets. Notícias e cotações atualizam a cada minuto.'
+        : 'Contexto importado do Copa Bets. Revise o prompt abaixo e clique em Iniciar previsão.'
   }
 
   if (fromCopa) {
@@ -604,6 +622,22 @@ const applyCopaBetsDeepLink = () => {
 onMounted(async () => {
   applyCopaBetsDeepLink()
   await loadMarketData()
+})
+
+let marketRefreshTimer = null
+
+watch(isCopaBetsImport, (fromCopa) => {
+  if (marketRefreshTimer) {
+    clearInterval(marketRefreshTimer)
+    marketRefreshTimer = null
+  }
+  if (fromCopa) {
+    marketRefreshTimer = setInterval(loadMarketData, 60_000)
+  }
+}, { immediate: true })
+
+onUnmounted(() => {
+  if (marketRefreshTimer) clearInterval(marketRefreshTimer)
 })
 
 watch(
@@ -929,6 +963,17 @@ watch(
   font-size: 0.8rem;
   color: #333;
   margin-bottom: 14px;
+}
+
+.market-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.market-updated {
+  font-size: 0.72rem;
+  color: #888;
 }
 
 .refresh-btn {

@@ -322,7 +322,61 @@ class ZepEntityReader:
         
         logger.info(f"筛选完成: 总节点 {total_count}, 符合条件 {len(filtered_entities)}, "
                    f"实体类型: {entity_types_found}")
-        
+
+        # Fallback: Zep often returns nodes without ontology labels (sparse Copa Bets graphs)
+        if not filtered_entities and all_nodes:
+            logger.warning(
+                "Nenhuma entidade tipada no grafo; usando fallback com %d nó(s) nomeado(s)",
+                len(all_nodes),
+            )
+            for node in all_nodes:
+                name = (node.get("name") or "").strip()
+                if not name:
+                    continue
+                labels = list(node.get("labels") or [])
+                if not any(l not in ["Entity", "Node"] for l in labels):
+                    labels = labels + ["Stakeholder"]
+                entity_types_found.add("Stakeholder")
+                entity = EntityNode(
+                    uuid=node["uuid"],
+                    name=name,
+                    labels=labels,
+                    summary=node.get("summary") or name,
+                    attributes=node.get("attributes") or {},
+                )
+                if enrich_with_edges:
+                    related_edges = []
+                    related_node_uuids = set()
+                    for edge in all_edges:
+                        if edge["source_node_uuid"] == node["uuid"]:
+                            related_edges.append({
+                                "direction": "outgoing",
+                                "edge_name": edge["name"],
+                                "fact": edge["fact"],
+                                "target_node_uuid": edge["target_node_uuid"],
+                            })
+                            related_node_uuids.add(edge["target_node_uuid"])
+                        elif edge["target_node_uuid"] == node["uuid"]:
+                            related_edges.append({
+                                "direction": "incoming",
+                                "edge_name": edge["name"],
+                                "fact": edge["fact"],
+                                "source_node_uuid": edge["source_node_uuid"],
+                            })
+                            related_node_uuids.add(edge["source_node_uuid"])
+                    entity.related_edges = related_edges
+                    entity.related_nodes = [
+                        {
+                            "uuid": node_map[u]["uuid"],
+                            "name": node_map[u]["name"],
+                            "labels": node_map[u]["labels"],
+                            "summary": node_map[u].get("summary", ""),
+                        }
+                        for u in related_node_uuids
+                        if u in node_map
+                    ]
+                filtered_entities.append(entity)
+
         return FilteredEntities(
             entities=filtered_entities,
             entity_types=entity_types_found,

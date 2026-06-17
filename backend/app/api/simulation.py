@@ -677,6 +677,21 @@ def get_prepare_status():
         
         # 如果提供了simulation_id，先检查是否已准备完成
         if simulation_id:
+            manager = SimulationManager()
+            sim_state = manager.get_simulation(simulation_id)
+            if sim_state and sim_state.status == SimulationStatus.FAILED:
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "simulation_id": simulation_id,
+                        "status": "failed",
+                        "progress": 0,
+                        "message": sim_state.error or t('api.prepareFailed'),
+                        "error": sim_state.error,
+                        "already_prepared": False,
+                    }
+                })
+
             is_prepared, prepare_info = _check_simulation_prepared(simulation_id)
             if is_prepared:
                 return jsonify({

@@ -424,6 +424,7 @@
     "connectingZepGraph": "Connecting to Zep graph...",
     "readingNodeData": "Reading node data...",
     "readingComplete": "Done, {count} entities found",
+    "noGraphEntities": "Nenhuma entidade no grafo. Reconstrua o grafo ou inicie um cenário novo.",
     "startGenerating": "Starting generation...",
     "analyzingRequirements": "Analyzing simulation requirements...",
     "generatingOutline": "Generating report outline...",

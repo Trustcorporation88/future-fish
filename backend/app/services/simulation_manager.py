@@ -15,6 +15,7 @@ from enum import Enum
 from ..config import Config
 from ..utils.logger import get_logger
 from .zep_entity_reader import ZepEntityReader, FilteredEntities
+from .entity_supplement import supplement_entities_from_context, MIN_ENTITIES_DEFAULT
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 from ..utils.locale import t
@@ -283,6 +284,21 @@ class SimulationManager:
                 defined_entity_types=defined_entity_types,
                 enrich_with_edges=True
             )
+
+            if filtered.filtered_count < MIN_ENTITIES_DEFAULT:
+                supplemented = supplement_entities_from_context(
+                    entities=filtered.entities,
+                    simulation_requirement=simulation_requirement,
+                    document_text=document_text,
+                    target_min=MIN_ENTITIES_DEFAULT,
+                )
+                if len(supplemented) > filtered.filtered_count:
+                    filtered.entities = supplemented
+                    filtered.filtered_count = len(supplemented)
+                    for ent in supplemented:
+                        et = ent.get_entity_type()
+                        if et:
+                            filtered.entity_types.add(et)
             
             state.entities_count = filtered.filtered_count
             state.entity_types = list(filtered.entity_types)
@@ -297,7 +313,7 @@ class SimulationManager:
             
             if filtered.filtered_count == 0:
                 state.status = SimulationStatus.FAILED
-                state.error = "没有找到符合条件的实体，请检查图谱是否正确构建"
+                state.error = t('progress.noGraphEntities')
                 self._save_simulation_state(state)
                 return state
             
