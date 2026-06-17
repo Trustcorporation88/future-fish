@@ -26,6 +26,11 @@ def refresh_config() -> None:
     Config.FINNHUB_API_KEY = _env_value('FINNHUB_API_KEY', '')
     Config.BRAPI_TOKEN = _env_value('BRAPI_TOKEN', '')
     Config.DEBUG = _env_value('FLASK_DEBUG', 'False').lower() == 'true'
+    Config.VIP_ADMIN_USERNAME = _env_value('VIP_ADMIN_USERNAME', '')
+    Config.VIP_ADMIN_PASSWORD = _env_value('VIP_ADMIN_PASSWORD', '')
+    Config.VIP_CLIENT_USERNAME = _env_value('VIP_CLIENT_USERNAME', '')
+    Config.VIP_CLIENT_PASSWORD = _env_value('VIP_CLIENT_PASSWORD', '')
+    Config.VIP_CLIENT_USERS = _env_value('VIP_CLIENT_USERS', '')
 
 def _env_value(name: str, default: str | None = None) -> str | None:
     """读取环境变量，并兼容 Warp/模板中常见的 {{valor}} 占位写法。"""
@@ -88,6 +93,29 @@ class Config:
     REPORT_AGENT_MAX_TOOL_CALLS = int(os.environ.get('REPORT_AGENT_MAX_TOOL_CALLS', '5'))
     REPORT_AGENT_MAX_REFLECTION_ROUNDS = int(os.environ.get('REPORT_AGENT_MAX_REFLECTION_ROUNDS', '2'))
     REPORT_AGENT_TEMPERATURE = float(os.environ.get('REPORT_AGENT_TEMPERATURE', '0.5'))
+
+    # VIP access (admin + client logins)
+    VIP_ADMIN_USERNAME = _env_value('VIP_ADMIN_USERNAME', '')
+    VIP_ADMIN_PASSWORD = _env_value('VIP_ADMIN_PASSWORD', '')
+    VIP_CLIENT_USERNAME = _env_value('VIP_CLIENT_USERNAME', '')
+    VIP_CLIENT_PASSWORD = _env_value('VIP_CLIENT_PASSWORD', '')
+    VIP_CLIENT_USERS = _env_value('VIP_CLIENT_USERS', '')  # extra clients: user:pass,user2:pass2
+    VIP_JWT_HOURS = int(os.environ.get('VIP_JWT_HOURS', '168'))  # 7 days
+    JWT_SECRET = _env_value('JWT_SECRET', '')
+
+    @classmethod
+    def jwt_secret(cls) -> str:
+        return cls.JWT_SECRET or cls.SECRET_KEY or 'mirofish-jwt-fallback'
+
+    @classmethod
+    def vip_auth_enabled(cls) -> bool:
+        explicit = _env_value('VIP_AUTH_ENABLED')
+        if explicit is not None:
+            return explicit.lower() == 'true'
+        has_admin = bool(cls.VIP_ADMIN_USERNAME and cls.VIP_ADMIN_PASSWORD)
+        has_client = bool(cls.VIP_CLIENT_USERNAME and cls.VIP_CLIENT_PASSWORD)
+        has_extra = bool(cls.VIP_CLIENT_USERS and ':' in cls.VIP_CLIENT_USERS)
+        return has_admin or has_client or has_extra
     
     @classmethod
     def validate(cls) -> list[str]:

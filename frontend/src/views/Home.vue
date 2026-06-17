@@ -2,8 +2,12 @@
   <div class="home-container">
     <!-- 顶部导航栏 -->
     <nav class="navbar">
-      <div class="nav-brand">MIROFISH</div>
+      <div class="nav-brand">MIROFISH <span v-if="auth.authEnabled && auth.isAuthenticated" class="vip-pill">VIP</span></div>
       <div class="nav-links">
+        <span v-if="auth.authEnabled && auth.isAuthenticated" class="user-pill">
+          {{ auth.displayLabel }}
+          <button type="button" class="logout-btn" @click="handleLogout">Sair</button>
+        </span>
         <LanguageSwitcher />
         <a href="https://github.com/666ghj/MiroFish" target="_blank" class="github-link">
           {{ $t('nav.visitGithub') }} <span class="arrow">↗</span>
@@ -17,7 +21,8 @@
         <div class="hero-left">
           <div class="tag-row">
             <span class="orange-tag">PREVISÃO FINANCEIRA</span>
-            <span class="version-text">notícias + cotações + documentos</span>
+            <span v-if="auth.authEnabled" class="version-text vip-access-tag">acesso VIP</span>
+            <span v-else class="version-text">notícias + cotações + documentos</span>
           </div>
           
           <h1 class="main-title">
@@ -303,9 +308,15 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import auth from '../store/auth'
 
 const router = useRouter()
 const route = useRoute()
+
+const handleLogout = () => {
+  auth.logout()
+  router.push({ name: 'Login' })
+}
 
 // 表单数据
 const formData = ref({
@@ -688,6 +699,45 @@ watch(
   font-weight: 800;
   letter-spacing: 1px;
   font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vip-pill {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.user-pill {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logout-btn {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vip-access-tag {
+  color: #a78bfa !important;
+  font-weight: 600;
 }
 
 .nav-links {

@@ -324,6 +324,10 @@
     "untitledSimulation": "Untitled simulation",
     "unknownFile": "Unknown file"
   },
+  "auth": {
+    "missingCredentials": "Informe usuário e senha.",
+    "invalidCredentials": "Usuário ou senha inválidos."
+  },
   "api": {
     "projectNotFound": "Project not found: {id}",
     "projectDeleteFailed": "Project not found or deletion failed: {id}",

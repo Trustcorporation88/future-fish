@@ -21,6 +21,10 @@ const service = axios.create({
 service.interceptors.request.use(
   config => {
     config.headers['Accept-Language'] = i18n.global.locale.value
+    const token = localStorage.getItem('future_vip_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   error => {
@@ -44,6 +48,17 @@ service.interceptors.response.use(
   },
   error => {
     console.error('Response error:', error)
+
+    const status = error.response?.status
+    const url = error.config?.url || ''
+    if (status === 401 && !url.includes('/api/auth/login') && !url.includes('/api/auth/config')) {
+      localStorage.removeItem('future_vip_token')
+      localStorage.removeItem('future_vip_user')
+      if (!window.location.pathname.startsWith('/login')) {
+        const redirect = encodeURIComponent(window.location.pathname + window.location.search)
+        window.location.href = `/login?redirect=${redirect}`
+      }
+    }
     
     // 处理超时
     if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {

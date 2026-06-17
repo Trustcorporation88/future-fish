@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import auth from '../store/auth'
 import Home from '../views/Home.vue'
+import Login from '../views/Login.vue'
 import Process from '../views/MainView.vue'
 import SimulationView from '../views/SimulationView.vue'
 import SimulationRunView from '../views/SimulationRunView.vue'
@@ -7,6 +9,11 @@ import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 
 const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+  },
   {
     path: '/',
     name: 'Home',
@@ -47,6 +54,33 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.beforeEach(async (to, from, next) => {
+  if (!auth.authReady.value) {
+    await auth.bootstrap()
+  }
+
+  if (to.name === 'Login') {
+    if (auth.authEnabled.value && auth.isAuthenticated.value) {
+      const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/'
+      return next(redirect)
+    }
+    return next()
+  }
+
+  if (!auth.authEnabled.value) {
+    return next()
+  }
+
+  if (auth.isAuthenticated.value) {
+    return next()
+  }
+
+  return next({
+    name: 'Login',
+    query: { redirect: to.fullPath + (typeof window !== 'undefined' ? window.location.hash : '') },
+  })
 })
 
 export default router
