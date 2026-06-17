@@ -309,6 +309,7 @@ import { useRoute, useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import auth from '../store/auth'
+import service from '../api/index'
 
 const router = useRouter()
 const route = useRoute()

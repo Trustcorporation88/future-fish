@@ -17,6 +17,26 @@ const service = axios.create({
   }
 })
 
+let authRedirectPending = false
+
+export function isAuthError(error) {
+  const status = error?.response?.status
+  if (status === 401) return true
+  const msg = error?.message || ''
+  return msg.includes('401') || msg.includes('VIP login')
+}
+
+function scheduleAuthRedirect() {
+  if (authRedirectPending || window.location.pathname.startsWith('/login')) return
+  authRedirectPending = true
+  setTimeout(() => {
+    localStorage.removeItem('future_vip_token')
+    localStorage.removeItem('future_vip_user')
+    const redirect = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)
+    window.location.href = `/login?redirect=${redirect}`
+  }, 1500)
+}
+
 // 请求拦截器
 service.interceptors.request.use(
   config => {
@@ -52,12 +72,11 @@ service.interceptors.response.use(
     const status = error.response?.status
     const url = error.config?.url || ''
     if (status === 401 && !url.includes('/api/auth/login') && !url.includes('/api/auth/config')) {
-      localStorage.removeItem('future_vip_token')
-      localStorage.removeItem('future_vip_user')
-      if (!window.location.pathname.startsWith('/login')) {
-        const redirect = encodeURIComponent(window.location.pathname + window.location.search)
-        window.location.href = `/login?redirect=${redirect}`
+      // Graph polling during simulation: don't kill the whole session
+      if (url.includes('/api/graph/data/')) {
+        return Promise.reject(error)
       }
+      scheduleAuthRedirect()
     }
     
     // 处理超时

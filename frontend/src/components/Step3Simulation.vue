@@ -296,6 +296,7 @@ import {
   getRunStatusDetail
 } from '../api/simulation'
 import { generateReport } from '../api/report'
+import { isAuthError } from '../api/index'
 
 const { t } = useI18n()
 
@@ -529,6 +530,12 @@ const fetchRunStatus = async () => {
       }
     }
   } catch (err) {
+    if (isAuthError(err)) {
+      addLog('Sessão VIP expirada. Atualize a página, entre novamente — a simulação pode continuar no servidor.')
+      stopPolling()
+      emit('update-status', 'error')
+      return
+    }
     console.warn('获取运行状态失败:', err)
   }
 }
