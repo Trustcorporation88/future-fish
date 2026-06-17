@@ -261,6 +261,10 @@ const loadProject = async () => {
       } else if (res.data.status === 'graph_completed' && res.data.graph_id) {
         currentPhase.value = 2
         await loadGraph(res.data.graph_id)
+      } else if (res.data.status === 'failed') {
+        currentPhase.value = 1
+        error.value = res.data.error || 'Projeto falhou'
+        addLog(`Projeto em falha: ${error.value}`)
       }
     } else {
       error.value = res.error
@@ -279,8 +283,13 @@ const updatePhaseByStatus = (status) => {
     case 'created':
     case 'ontology_generated': currentPhase.value = 0; break;
     case 'graph_building': currentPhase.value = 1; break;
-    case 'graph_completed': currentPhase.value = 2; break;
-    case 'failed': error.value = 'Projeto falhou'; break;
+    case 'graph_completed':
+      currentPhase.value = 2
+      break
+    case 'failed':
+      error.value = 'Projeto falhou'
+      currentPhase.value = 1
+      break
   }
 }
 
@@ -350,19 +359,24 @@ const pollTaskStatus = async (taskId) => {
       if (task.status === 'completed') {
         addLog('Construção do grafo concluída.')
         stopPolling()
-        stopGraphPolling() // Stop polling, do final load
-        currentPhase.value = 2
-        
-        // Final load
+        stopGraphPolling()
+
         const projRes = await getProject(currentProjectId.value)
         if (projRes.success && projRes.data.graph_id) {
-            projectData.value = projRes.data
-            await loadGraph(projRes.data.graph_id)
+          projectData.value = projRes.data
+          currentPhase.value = 2
+          await loadGraph(projRes.data.graph_id)
+        } else {
+          currentPhase.value = 1
+          error.value = projRes.data?.error || 'O grafo não foi criado. Verifique a ZEP_API_KEY no Railway.'
+          addLog(`Construção incompleta: ${error.value}`)
         }
       } else if (task.status === 'failed') {
         stopPolling()
-        error.value = task.error
-        addLog(`Construção do grafo falhou: ${task.error}`)
+        stopGraphPolling()
+        currentPhase.value = 1
+        error.value = task.error || task.message || 'Falha na construção do grafo'
+        addLog(`Construção do grafo falhou: ${error.value}`)
       }
     }
   } catch (e) {

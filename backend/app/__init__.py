@@ -13,6 +13,7 @@ from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 
 from .config import Config, refresh_config
+from .utils.zep_errors import verify_zep_api_key
 from .utils.logger import setup_logger, get_logger
 
 
@@ -77,6 +78,9 @@ def create_app(config_class=Config):
     @app.route('/healthz')
     def health():
         config_errors = Config.validate()
+        zep_error = verify_zep_api_key(Config.ZEP_API_KEY) if Config.ZEP_API_KEY else None
+        if zep_error:
+            config_errors = list(config_errors) + [zep_error]
         return {
             'status': 'ok' if not config_errors else 'degraded',
             'service': 'MiroFish Backend',

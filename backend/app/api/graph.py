@@ -15,7 +15,7 @@ from ..services.graph_builder import GraphBuilderService
 from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
-from ..utils.locale import t, get_locale, set_locale
+from ..utils.zep_errors import format_zep_error, verify_zep_api_key
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
@@ -293,6 +293,14 @@ def build_graph():
                 "success": False,
                 "error": t('api.configError', details="; ".join(errors))
             }), 500
+
+        zep_error = verify_zep_api_key(Config.ZEP_API_KEY)
+        if zep_error:
+            logger.error(f"Zep API key check failed: {zep_error}")
+            return jsonify({
+                "success": False,
+                "error": zep_error
+            }), 503
         
         # 解析请求
         data = request.get_json() or {}
@@ -493,18 +501,18 @@ def build_graph():
                 )
                 
             except Exception as e:
-                # 更新项目状态为失败
-                build_logger.error(f"[{task_id}] 图谱构建失败: {str(e)}")
+                friendly = format_zep_error(e)
+                build_logger.error(f"[{task_id}] 图谱构建失败: {friendly}")
                 build_logger.debug(traceback.format_exc())
-                
+
                 project.status = ProjectStatus.FAILED
-                project.error = str(e)
+                project.error = friendly
                 ProjectManager.save_project(project)
-                
+
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.FAILED,
-                    message=t('progress.buildFailed', error=str(e)),
+                    message=t('progress.buildFailed', error=friendly),
                     error=traceback.format_exc()
                 )
         

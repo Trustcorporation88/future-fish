@@ -156,11 +156,14 @@
         </div>
         
         <div class="card-content">
+          <p v-if="projectData?.error || projectData?.status === 'failed'" class="build-error-banner">
+            {{ projectData?.error || 'Falha na construção do grafo.' }}
+          </p>
           <p class="api-note">POST /api/simulation/create</p>
           <p class="description">{{ $t('step1.buildCompleteDesc') }}</p>
           <button 
             class="action-btn" 
-            :disabled="currentPhase < 2 || creatingSimulation"
+            :disabled="!canEnterEnvSetup || creatingSimulation"
             @click="handleEnterEnvSetup"
           >
             <span v-if="creatingSimulation" class="spinner-sm"></span>
@@ -209,6 +212,10 @@ defineEmits(['next-step'])
 const selectedOntologyItem = ref(null)
 const logContent = ref(null)
 const creatingSimulation = ref(false)
+
+const canEnterEnvSetup = computed(() => {
+  return props.currentPhase >= 2 && Boolean(props.projectData?.graph_id)
+})
 
 // 进入环境搭建 - 创建 simulation 并跳转
 const handleEnterEnvSetup = async () => {
@@ -601,6 +608,16 @@ watch(() => props.systemLogs.length, () => {
 }
 
 /* Step 03 Button */
+.build-error-banner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
 .action-btn {
   width: 100%;
   background: #000;

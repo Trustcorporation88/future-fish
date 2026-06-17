@@ -25,7 +25,7 @@ COPY . .
 
 ENV VITE_API_BASE_URL=
 # Invalida cache do frontend quando a integração Copa Bets muda
-RUN echo "frontend-build-copa-deeplink-v3-quotes" && npm run build
+RUN echo "frontend-build-zep-auth-fix-v1" && npm run build
 
 ENV NODE_ENV=production
 ENV FLASK_DEBUG=False
