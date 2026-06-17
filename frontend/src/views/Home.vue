@@ -253,6 +253,9 @@
 
             <!-- 输入区域 -->
             <div class="console-section">
+              <div v-if="copaImportBanner" class="copa-import-banner">
+                {{ copaImportBanner }}
+              </div>
               <div class="console-header">
                 <span class="console-label">O que você quer prever?</span>
               </div>
@@ -291,12 +294,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // 表单数据
 const formData = ref({
@@ -315,6 +319,8 @@ const isDragOver = ref(false)
 const marketLoading = ref(false)
 const quotes = ref([])
 const news = ref([])
+const isCopaBetsImport = ref(false)
+const copaImportBanner = ref('')
 
 // 文件输入引用
 const fileInput = ref(null)
@@ -323,7 +329,12 @@ const pasteBox = ref(null)
 // 计算属性:是否可以提交
 const canSubmit = computed(() => {
   const hasRequirement = formData.value.simulationRequirement.trim() !== ''
-  const hasInput = files.value.length > 0 || urls.value.length > 0 || quotes.value.length > 0 || news.value.length > 0
+  const hasInput =
+    files.value.length > 0 ||
+    urls.value.length > 0 ||
+    quotes.value.length > 0 ||
+    news.value.length > 0 ||
+    isCopaBetsImport.value
   return hasRequirement && hasInput
 })
 
@@ -536,9 +547,70 @@ const startSimulation = () => {
   })
 }
 
-onMounted(() => {
-  loadMarketData()
+const readPromptFromUrl = () => {
+  const hash = window.location.hash
+  if (hash.startsWith('#prompt=')) {
+    try {
+      return decodeURIComponent(hash.slice('#prompt='.length)).trim()
+    } catch {
+      /* ignore malformed hash */
+    }
+  }
+
+  const q = route.query.prompt
+  if (typeof q === 'string' && q.trim()) return q.trim()
+  return null
+}
+
+const applyCopaBetsDeepLink = () => {
+  const fromCopa = route.query.from === 'copa-bets'
+  const promptText = readPromptFromUrl()
+
+  if (!fromCopa && !promptText) return
+
+  isCopaBetsImport.value = fromCopa
+
+  if (promptText) {
+    formData.value.simulationRequirement = promptText
+  } else if (fromCopa && route.query.home && route.query.away) {
+    const home = String(route.query.home)
+    const away = String(route.query.away)
+    const date = route.query.date ? String(route.query.date) : ''
+    formData.value.simulationRequirement =
+      `Simule cenários para a Copa do Mundo 2026: ${home} x ${away}${date ? ` (${date})` : ''}.`
+  }
+
+  if (fromCopa || promptText) {
+    const home = route.query.home ? String(route.query.home) : 'Casa'
+    const away = route.query.away ? String(route.query.away) : 'Fora'
+    const sourceRef = `Copa Bets 2026 — ${home} x ${away} (https://bets.seligaaqui.online/)`
+    if (!urls.value.some((u) => u.includes('bets.seligaaqui.online'))) {
+      urls.value.push(sourceRef)
+    }
+    copaImportBanner.value =
+      'Contexto importado do Copa Bets. Revise o prompt abaixo e clique em Iniciar previsão.'
+  }
+
+  if (fromCopa) {
+    setTimeout(() => {
+      document.querySelector('.console-section textarea')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      })
+    }, 400)
+  }
+}
+
+onMounted(async () => {
+  applyCopaBetsDeepLink()
+  await loadMarketData()
 })
+
+watch(
+  () => route.query,
+  () => applyCopaBetsDeepLink(),
+  { deep: true }
+)
 </script>
 
 <style scoped>
@@ -1020,6 +1092,16 @@ onMounted(() => {
 .console-box {
   border: 1px solid #CCC; /* 外部实线 */
   padding: 8px; /* 内边距形成双重边框感 */
+}
+
+.copa-import-banner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #7c3aed;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .console-section {
