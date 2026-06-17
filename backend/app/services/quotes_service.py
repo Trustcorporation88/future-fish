@@ -6,6 +6,8 @@ Uses Finnhub for US ETFs/commodities, BRAPI for Brazilian market/currency, and C
 import requests
 from datetime import datetime
 from typing import Dict, List, Optional
+from urllib.parse import quote
+
 from ..config import Config
 from ..utils.logger import get_logger
 
@@ -19,12 +21,12 @@ class QuotesService:
     BRAPI_TOKEN = Config.BRAPI_TOKEN
 
     QUOTES = {
-        'sp500': {'symbol': 'SPY', 'name': 'S&P 500', 'source': 'finnhub', 'type': 'index', 'currency': 'USD'},
-        'dowjones': {'symbol': 'DIA', 'name': 'Dow Jones', 'source': 'finnhub', 'type': 'index', 'currency': 'USD'},
+        'sp500': {'symbol': '^GSPC', 'name': 'S&P 500', 'source': 'yahoo', 'type': 'index', 'currency': 'USD'},
+        'dowjones': {'symbol': '^DJI', 'name': 'Dow Jones', 'source': 'yahoo', 'type': 'index', 'currency': 'USD'},
         'ibovespa': {'symbol': '^BVSP', 'name': 'IBOVESPA', 'source': 'brapi_yahoo_fallback', 'type': 'index', 'currency': 'BRL'},
         'dolar': {'symbol': 'USD-BRL', 'name': 'Dólar/Real', 'source': 'brapi_currency', 'type': 'currency', 'currency': 'BRL'},
-        'brent': {'symbol': 'BZ', 'name': 'Petróleo Brent', 'source': 'finnhub', 'type': 'commodity', 'currency': 'USD'},
-        'ouro': {'symbol': 'GLD', 'name': 'Ouro (USD/onça)', 'source': 'finnhub_yahoo_fallback', 'type': 'commodity', 'currency': 'USD'},
+        'brent': {'symbol': 'BZ=F', 'name': 'Petróleo Brent', 'source': 'yahoo', 'type': 'commodity', 'currency': 'USD'},
+        'ouro': {'symbol': 'GC=F', 'name': 'Ouro (USD/onça)', 'source': 'yahoo', 'type': 'commodity', 'currency': 'USD'},
         'bitcoin': {'symbol': 'BTC', 'name': 'Bitcoin', 'source': 'crypto', 'type': 'crypto', 'currency': 'USD'}
     }
 
@@ -40,6 +42,8 @@ class QuotesService:
         try:
             if source == 'finnhub':
                 return QuotesService._fetch_finnhub_quote(quote_key, quote_info)
+            if source == 'yahoo':
+                return QuotesService._fetch_yahoo_quote(quote_key, quote_info)
             if source == 'finnhub_yahoo_fallback':
                 quote = QuotesService._fetch_finnhub_quote(quote_key, quote_info)
                 if quote:
@@ -231,8 +235,9 @@ class QuotesService:
     @staticmethod
     def _fetch_yahoo_quote(quote_key: str, quote_info: Dict) -> Optional[Dict]:
         """Fallback quote from Yahoo Finance."""
+        symbol = quote(quote_info['symbol'], safe='')
         response = requests.get(
-            f"https://query1.finance.yahoo.com/v8/finance/chart/{quote_info['symbol']}",
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
             params={'range': '1d', 'interval': '1m'},
             headers={'User-Agent': 'Mozilla/5.0'},
             timeout=10
