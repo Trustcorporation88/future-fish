@@ -24,21 +24,21 @@ from app.config import Config
 
 def main():
     """主函数"""
-    # 验证配置
     errors = Config.validate()
     if errors:
-        print("配置错误:")
+        print("Aviso de configuracao (app sobe, mas simulacoes podem falhar):")
         for err in errors:
             print(f"  - {err}")
-        print("\n请检查 .env 文件中的配置")
-        sys.exit(1)
+        print("Defina LLM_API_KEY e ZEP_API_KEY no Railway → Variables")
+        if os.environ.get('REQUIRE_CONFIG', '').lower() in ('1', 'true', 'yes'):
+            sys.exit(1)
     
     # 创建应用
     app = create_app()
     
-    # 获取运行配置
+    # Railway usa PORT; local usa FLASK_PORT
     host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    port = int(os.environ.get('FLASK_PORT', 5001))
+    port = int(os.environ.get('PORT') or os.environ.get('FLASK_PORT', 5001))
     debug = Config.DEBUG
     
     # 启动服务

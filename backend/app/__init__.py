@@ -9,7 +9,7 @@ import warnings
 # 需要在所有其他导入之前设置
 warnings.filterwarnings("ignore", message=".*resource_tracker.*")
 
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 
 from .config import Config
@@ -73,11 +73,37 @@ def create_app(config_class=Config):
     
     # 健康检查
     @app.route('/health')
+    @app.route('/healthz')
     def health():
-        return {'status': 'ok', 'service': 'MiroFish Backend'}
+        config_errors = Config.validate()
+        return {
+            'status': 'ok' if not config_errors else 'degraded',
+            'service': 'MiroFish Backend',
+            'config_errors': config_errors,
+        }
+    
+    _register_frontend(app)
     
     if should_log_startup:
         logger.info("MiroFish Backend 启动完成")
     
     return app
+
+
+def _register_frontend(app: Flask) -> None:
+    """Produção: servir build do Vite pelo Flask (Railway / Docker prod)."""
+    dist = os.path.abspath(os.path.join(app.root_path, '../../frontend/dist'))
+    if not os.path.isdir(dist):
+        return
+
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def serve_spa(path: str):
+        if path.startswith('api/') or path in ('health', 'healthz'):
+            from flask import abort
+            abort(404)
+        target = os.path.join(dist, path)
+        if path and os.path.isfile(target):
+            return send_from_directory(dist, path)
+        return send_from_directory(dist, 'index.html')
 

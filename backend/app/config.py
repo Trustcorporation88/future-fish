@@ -33,7 +33,7 @@ class Config:
     
     # Flask配置
     SECRET_KEY = _env_value('SECRET_KEY', 'mirofish-secret-key')
-    DEBUG = _env_value('FLASK_DEBUG', 'True').lower() == 'true'
+    DEBUG = _env_value('FLASK_DEBUG', 'False').lower() == 'true'
     
     # JSON配置 - 禁用ASCII转义，让中文直接显示（而不是 \uXXXX 格式）
     JSON_AS_ASCII = False

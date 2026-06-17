@@ -1,9 +1,16 @@
 import axios from 'axios'
 import i18n from '../i18n'
 
-// 创建axios实例
+// Produção (Railway): VITE_API_BASE_URL="" → mesma origem (/api/...)
+// Dev: proxy Vite ou localhost:5001
+const configuredBase = import.meta.env.VITE_API_BASE_URL
+const baseURL =
+  configuredBase !== undefined && configuredBase !== null
+    ? configuredBase
+    : (import.meta.env.PROD ? '' : 'http://localhost:5001')
+
 const service = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001',
+  baseURL,
   timeout: 300000, // 5分钟超时（本体生成可能需要较长时间）
   headers: {
     'Content-Type': 'application/json'
