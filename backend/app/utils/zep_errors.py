@@ -25,7 +25,7 @@ def verify_zep_api_key(api_key: str | None) -> str | None:
         from zep_cloud.client import Zep
 
         client = Zep(api_key=api_key)
-        client.graph.list_all(limit=1)
+        client.graph.list_all()
         return None
     except Exception as exc:
         return format_zep_error(exc)
