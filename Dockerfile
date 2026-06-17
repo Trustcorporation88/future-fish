@@ -24,7 +24,8 @@ RUN npm ci \
 COPY . .
 
 ENV VITE_API_BASE_URL=
-RUN npm run build
+# Invalida cache do frontend quando a integração Copa Bets muda
+RUN echo "frontend-build-copa-deeplink-v2" && npm run build
 
 ENV NODE_ENV=production
 ENV FLASK_DEBUG=False
