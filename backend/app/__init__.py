@@ -12,12 +12,13 @@ warnings.filterwarnings("ignore", message=".*resource_tracker.*")
 from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 
-from .config import Config
+from .config import Config, refresh_config
 from .utils.logger import setup_logger, get_logger
 
 
 def create_app(config_class=Config):
     """Flask应用工厂函数"""
+    refresh_config()
     app = Flask(__name__)
     app.config.from_object(config_class)
     

@@ -11,10 +11,21 @@ from dotenv import load_dotenv
 project_root_env = os.path.join(os.path.dirname(__file__), '../../.env')
 
 if os.path.exists(project_root_env):
-    load_dotenv(project_root_env, override=True)
+    # override=False: variáveis do Railway/processo têm prioridade sobre .env local
+    load_dotenv(project_root_env, override=False)
 else:
-    # 如果根目录没有 .env，尝试加载环境变量（用于生产环境）
-    load_dotenv(override=True)
+    load_dotenv(override=False)
+
+
+def refresh_config() -> None:
+    """Relê env vars em runtime (Railway injeta após import do módulo)."""
+    Config.LLM_API_KEY = _env_value('LLM_API_KEY')
+    Config.LLM_BASE_URL = _env_value('LLM_BASE_URL', 'https://api.openai.com/v1')
+    Config.LLM_MODEL_NAME = _env_value('LLM_MODEL_NAME', 'gpt-4o-mini')
+    Config.ZEP_API_KEY = _env_value('ZEP_API_KEY')
+    Config.FINNHUB_API_KEY = _env_value('FINNHUB_API_KEY', '')
+    Config.BRAPI_TOKEN = _env_value('BRAPI_TOKEN', '')
+    Config.DEBUG = _env_value('FLASK_DEBUG', 'False').lower() == 'true'
 
 def _env_value(name: str, default: str | None = None) -> str | None:
     """读取环境变量，并兼容 Warp/模板中常见的 {{valor}} 占位写法。"""
@@ -81,6 +92,7 @@ class Config:
     @classmethod
     def validate(cls) -> list[str]:
         """验证必要配置"""
+        refresh_config()
         errors: list[str] = []
         if not cls.LLM_API_KEY:
             errors.append("LLM_API_KEY 未配置")

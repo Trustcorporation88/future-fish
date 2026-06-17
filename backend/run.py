@@ -19,11 +19,12 @@ if sys.platform == 'win32':
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app
-from app.config import Config
+from app.config import Config, refresh_config
 
 
 def main():
     """主函数"""
+    refresh_config()
     errors = Config.validate()
     if errors:
         print("Aviso de configuracao (app sobe, mas simulacoes podem falhar):")
