@@ -86,6 +86,42 @@ def _bearer_token() -> Optional[str]:
     return None
 
 
+def role_required(*roles: str):
+    """Restrict a route to VIP sessions whose role is in `roles` (no-op if VIP auth is disabled).
+
+    Projects/graphs have no per-user ownership in this app, so any authenticated VIP
+    session could otherwise delete data belonging to a different user.
+    """
+
+    def decorator(f: Callable):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not Config.vip_auth_enabled():
+                return f(*args, **kwargs)
+
+            token = _bearer_token()
+            if not token:
+                return jsonify({"success": False, "error": "VIP login required", "code": "auth_required"}), 401
+
+            payload = decode_access_token(token)
+            if not payload:
+                return jsonify({"success": False, "error": "Invalid or expired session", "code": "auth_invalid"}), 401
+
+            if payload.get("role") not in roles:
+                return jsonify({"success": False, "error": "Insufficient permissions", "code": "forbidden"}), 403
+
+            g.vip_user = {
+                "username": payload.get("sub"),
+                "role": payload.get("role"),
+                "label": payload.get("label"),
+            }
+            return f(*args, **kwargs)
+
+        return decorated
+
+    return decorator
+
+
 def vip_required(f: Callable):
     @wraps(f)
     def decorated(*args, **kwargs):

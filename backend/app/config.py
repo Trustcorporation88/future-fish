@@ -48,7 +48,7 @@ class Config:
     """Flask配置类"""
     
     # Flask配置
-    SECRET_KEY = _env_value('SECRET_KEY', 'mirofish-secret-key')
+    SECRET_KEY = _env_value('SECRET_KEY', '')
     DEBUG = _env_value('FLASK_DEBUG', 'False').lower() == 'true'
     
     # JSON配置 - 禁用ASCII转义，让中文直接显示（而不是 \uXXXX 格式）
@@ -105,7 +105,13 @@ class Config:
 
     @classmethod
     def jwt_secret(cls) -> str:
-        return cls.JWT_SECRET or cls.SECRET_KEY or 'mirofish-jwt-fallback'
+        secret = cls.JWT_SECRET or cls.SECRET_KEY
+        if not secret:
+            raise RuntimeError(
+                "JWT_SECRET (ou SECRET_KEY) nao configurado. Defina JWT_SECRET no ambiente antes "
+                "de emitir ou validar sessoes VIP - nao ha fallback padrao por seguranca."
+            )
+        return secret
 
     @classmethod
     def vip_auth_enabled(cls) -> bool:
@@ -116,6 +122,16 @@ class Config:
         has_client = bool(cls.VIP_CLIENT_USERNAME and cls.VIP_CLIENT_PASSWORD)
         has_extra = bool(cls.VIP_CLIENT_USERS and ':' in cls.VIP_CLIENT_USERS)
         return has_admin or has_client or has_extra
+
+    @classmethod
+    def require_jwt_secret_if_vip_enabled(cls) -> None:
+        """Falha rapido no startup se VIP auth estiver habilitado sem um segredo JWT real."""
+        if cls.vip_auth_enabled() and not (cls.JWT_SECRET or cls.SECRET_KEY):
+            raise RuntimeError(
+                "VIP auth habilitado (VIP_ADMIN_*/VIP_CLIENT_*) mas JWT_SECRET/SECRET_KEY "
+                "nao esta definido no ambiente. Defina JWT_SECRET com uma string longa e "
+                "aleatoria antes de iniciar - sem isso, sessoes VIP poderiam ser forjadas."
+            )
     
     @classmethod
     def validate(cls) -> list[str]:

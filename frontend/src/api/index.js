@@ -22,9 +22,15 @@ let authRedirectPending = false
 export function isAuthError(error) {
   const status = error?.response?.status
   if (status === 401) return true
+  const code = error?.response?.data?.code
+  if (code === 'auth_required' || code === 'auth_invalid') return true
   const msg = error?.message || ''
   return msg.includes('401') || msg.includes('VIP login')
 }
+
+// Endpoints polled continuously during a running simulation: a 401 here (session
+// expiring mid-run) must not force-logout the user away from a live simulation.
+const AUTH_REDIRECT_EXEMPT_PATTERNS = ['/api/graph/data/', '/run-status']
 
 function scheduleAuthRedirect() {
   if (authRedirectPending || window.location.pathname.startsWith('/login')) return
@@ -72,8 +78,8 @@ service.interceptors.response.use(
     const status = error.response?.status
     const url = error.config?.url || ''
     if (status === 401 && !url.includes('/api/auth/login') && !url.includes('/api/auth/config')) {
-      // Graph polling during simulation: don't kill the whole session
-      if (url.includes('/api/graph/data/')) {
+      // Polling during a live simulation (graph refresh, run-status): don't kill the session
+      if (AUTH_REDIRECT_EXEMPT_PATTERNS.some(pattern => url.includes(pattern))) {
         return Promise.reject(error)
       }
       scheduleAuthRedirect()

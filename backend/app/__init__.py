@@ -20,6 +20,7 @@ from .utils.logger import setup_logger, get_logger
 def create_app(config_class=Config):
     """Flask应用工厂函数"""
     refresh_config()
+    Config.require_jwt_secret_if_vip_enabled()
     app = Flask(__name__)
     app.config.from_object(config_class)
     

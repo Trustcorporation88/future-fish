@@ -17,6 +17,7 @@ from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
 from ..utils.zep_errors import format_zep_error, verify_zep_api_key
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.auth import role_required
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
@@ -69,6 +70,7 @@ def list_projects():
 
 
 @graph_bp.route('/project/<project_id>', methods=['DELETE'])
+@role_required('admin')
 def delete_project(project_id: str):
     """
     删除项目
@@ -611,6 +613,7 @@ def get_graph_data(graph_id: str):
 
 
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
+@role_required('admin')
 def delete_graph(graph_id: str):
     """
     删除Zep图谱
