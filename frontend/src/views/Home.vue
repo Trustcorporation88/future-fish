@@ -461,13 +461,10 @@ const addUrl = () => {
 const loadMarketData = async () => {
   marketLoading.value = true
   try {
-    const [quotesResponse, newsResponse] = await Promise.all([
-      fetch('/api/quotes/list'),
-      fetch('/api/news/list?limit=8&category=market')
+    const [quotesData, newsData] = await Promise.all([
+      service.get('/api/quotes/list'),
+      service.get('/api/news/list?limit=8&category=market')
     ])
-
-    const quotesData = await quotesResponse.json()
-    const newsData = await newsResponse.json()
 
     if (quotesData.success) {
       quotes.value = quotesData.data.quotes || []
