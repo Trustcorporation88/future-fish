@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 from enum import Enum
 from dataclasses import dataclass, field, asdict
 from ..config import Config
+from ..utils.ids import validate_id, InvalidIdError
 
 
 class ProjectStatus(str, Enum):
@@ -111,7 +112,13 @@ class ProjectManager:
     
     @classmethod
     def _get_project_dir(cls, project_id: str) -> str:
-        """获取项目目录路径"""
+        """
+        获取项目目录路径
+
+        所有项目文件路径都经由此处拼接，因此在这里统一校验 project_id，
+        避免 `../` 等输入越出 PROJECTS_DIR。
+        """
+        validate_id(project_id, 'project_id')
         return os.path.join(cls.PROJECTS_DIR, project_id)
     
     @classmethod
@@ -209,6 +216,13 @@ class ProjectManager:
         
         projects = []
         for project_id in os.listdir(cls.PROJECTS_DIR):
+            # 跳过不符合项目 ID 格式的条目（如 .DS_Store、手工复制的备份目录）：
+            # 这类名字会让 _get_project_dir 的校验抛异常，进而使整个列表接口失败
+            try:
+                validate_id(project_id, 'project_id')
+            except InvalidIdError:
+                continue
+
             project = cls.get_project(project_id)
             if project:
                 projects.append(project)

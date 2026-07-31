@@ -323,6 +323,8 @@
     "invalidCredentials": "Invalid username or password."
   },
   "api": {
+    "errorTimeout": "Request timed out. The server may still be processing it — check back shortly.",
+    "errorNetwork": "Cannot reach the server. Check that the backend is running.",
     "projectNotFound": "Project not found: {id}",
     "projectDeleteFailed": "Project not found or deletion failed: {id}",
     "projectDeleted": "Project deleted: {id}",

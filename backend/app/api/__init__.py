@@ -12,3 +12,8 @@ from . import graph  # noqa: E402, F401
 from . import simulation  # noqa: E402, F401
 from . import report  # noqa: E402, F401
 
+from .guards import register_path_id_guard  # noqa: E402
+
+# 三个蓝图统一校验参与路径拼接的 ID
+register_path_id_guard(graph_bp, simulation_bp, report_bp)
+

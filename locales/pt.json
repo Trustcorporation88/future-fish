@@ -329,6 +329,8 @@
     "invalidCredentials": "Usuário ou senha inválidos."
   },
   "api": {
+    "errorTimeout": "A requisição expirou. O servidor pode ainda estar processando — verifique o resultado em instantes.",
+    "errorNetwork": "Não foi possível conectar ao servidor. Verifique se o backend está no ar.",
     "projectNotFound": "Project not found: {id}",
     "projectDeleteFailed": "Project not found or deletion failed: {id}",
     "projectDeleted": "Project deleted: {id}",
