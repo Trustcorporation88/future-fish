@@ -19,6 +19,7 @@ from .entity_supplement import supplement_entities_from_context, MIN_ENTITIES_DE
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 from ..utils.locale import t
+from ..utils.ids import validate_id
 
 logger = get_logger('mirofish.simulation')
 
@@ -138,7 +139,13 @@ class SimulationManager:
         self._simulations: Dict[str, SimulationState] = {}
     
     def _get_simulation_dir(self, simulation_id: str) -> str:
-        """获取模拟数据目录"""
+        """
+        获取模拟数据目录
+
+        此方法会创建目录，未校验的 ID 可以在存储目录之外建目录，
+        因此在拼接前统一校验 simulation_id。
+        """
+        validate_id(simulation_id, 'simulation_id')
         sim_dir = os.path.join(self.SIMULATION_DATA_DIR, simulation_id)
         os.makedirs(sim_dir, exist_ok=True)
         return sim_dir

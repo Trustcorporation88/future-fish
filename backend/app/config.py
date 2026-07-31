@@ -26,6 +26,7 @@ def refresh_config() -> None:
     Config.FINNHUB_API_KEY = _env_value('FINNHUB_API_KEY', '')
     Config.BRAPI_TOKEN = _env_value('BRAPI_TOKEN', '')
     Config.DEBUG = _env_value('FLASK_DEBUG', 'False').lower() == 'true'
+    Config.CORS_ORIGINS = _cors_origins()
     Config.VIP_ADMIN_USERNAME = _env_value('VIP_ADMIN_USERNAME', '')
     Config.VIP_ADMIN_PASSWORD = _env_value('VIP_ADMIN_PASSWORD', '')
     Config.VIP_CLIENT_USERNAME = _env_value('VIP_CLIENT_USERNAME', '')
@@ -44,13 +45,28 @@ def _env_value(name: str, default: str | None = None) -> str | None:
     return value
 
 
+def _cors_origins() -> list[str]:
+    """
+    解析 CORS 允许的来源（逗号分隔）
+
+    默认只允许本机前端：生产环境下 SPA 与接口同源，同源请求不经过 CORS，
+    所以无需放开；通配符会让任意站点带着用户的 VIP token 代表用户调用接口。
+    若前端部署在别的域名，用 CORS_ORIGINS 显式列出。
+    """
+    raw = _env_value('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000')
+    return [origin.strip() for origin in (raw or '').split(',') if origin.strip()]
+
+
 class Config:
     """Flask配置类"""
     
     # Flask配置
     SECRET_KEY = _env_value('SECRET_KEY', '')
     DEBUG = _env_value('FLASK_DEBUG', 'False').lower() == 'true'
-    
+
+    # CORS 允许的来源，详见 _cors_origins()
+    CORS_ORIGINS = _cors_origins()
+
     # JSON配置 - 禁用ASCII转义，让中文直接显示（而不是 \uXXXX 格式）
     JSON_AS_ASCII = False
     

@@ -319,6 +319,8 @@
     "unknownFile": "未知文件"
   },
   "api": {
+    "errorTimeout": "请求超时，服务端可能仍在处理，请稍后查看结果",
+    "errorNetwork": "无法连接到服务端，请检查后端是否已启动",
     "projectNotFound": "项目不存在: {id}",
     "projectDeleteFailed": "项目不存在或删除失败: {id}",
     "projectDeleted": "项目已删除: {id}",

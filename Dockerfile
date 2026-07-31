@@ -33,4 +33,8 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5001
 
+# 容器内必须监听 0.0.0.0 才能被宿主机/Railway 访问，所以在镜像里显式声明。
+# 这是 ENV 而非 compose 的 environment，因此 .env 仍可覆盖。
+ENV FLASK_HOST=0.0.0.0
+
 CMD ["npm", "run", "start"]

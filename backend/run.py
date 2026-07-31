@@ -41,7 +41,17 @@ def main():
     host = os.environ.get('FLASK_HOST', '0.0.0.0')
     port = int(os.environ.get('PORT') or os.environ.get('FLASK_PORT', 5001))
     debug = Config.DEBUG
-    
+
+    # 对外监听时开启 DEBUG 会把 Werkzeug 调试控制台暴露到网络上，
+    # 等同于允许任意人执行代码，因此直接拒绝启动。
+    if debug and host not in ('127.0.0.1', 'localhost', '::1'):
+        print(
+            f"拒绝启动：FLASK_DEBUG 已开启且监听地址为 {host}。\n"
+            "调试模式会暴露可执行代码的交互式控制台。\n"
+            "请设置 FLASK_DEBUG=false，或将 FLASK_HOST 改为 127.0.0.1。"
+        )
+        sys.exit(1)
+
     # 启动服务
     app.run(host=host, port=port, debug=debug, threaded=True)
 

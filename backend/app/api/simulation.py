@@ -4,7 +4,6 @@ Step2: Zep实体读取与过滤、OASIS模拟准备与运行（全程自动化�
 """
 
 import os
-import traceback
 from flask import request, jsonify, send_file
 
 from . import simulation_bp
@@ -15,6 +14,8 @@ from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.errors import report_exception
+from ..utils.ids import validate_id, InvalidIdError
 from ..models.project import ProjectManager
 
 logger = get_logger('mirofish.api.simulation')
@@ -86,7 +87,7 @@ def get_graph_entities(graph_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -119,7 +120,7 @@ def get_entity_detail(graph_id: str, entity_uuid: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -156,7 +157,7 @@ def get_entities_by_type(graph_id: str, entity_type: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -233,7 +234,7 @@ def create_simulation():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -255,9 +256,15 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     """
     import os
     from ..config import Config
-    
+
+    # 此函数返回 (bool, dict)，不抛异常，因此非法 ID 按“未准备”处理
+    try:
+        validate_id(simulation_id, 'simulation_id')
+    except InvalidIdError:
+        return False, {"reason": "非法的 simulation_id"}
+
     simulation_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
-    
+
     # 检查目录是否存在
     if not os.path.exists(simulation_dir):
         return False, {"reason": "模拟目录不存在"}
@@ -635,7 +642,7 @@ def prepare_simulation():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -796,7 +803,7 @@ def get_simulation(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -825,7 +832,7 @@ def list_simulations():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -998,7 +1005,7 @@ def get_simulation_history():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1036,7 +1043,7 @@ def get_simulation_profiles(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1074,8 +1081,9 @@ def get_simulation_profiles_realtime(simulation_id: str):
     
     try:
         platform = request.args.get('platform', 'reddit')
-        
-        # 获取模拟目录
+
+        # 获取模拟目录（校验 ID，避免拼出存储目录之外的路径）
+        validate_id(simulation_id, 'simulation_id')
         sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
         
         if not os.path.exists(sim_dir):
@@ -1141,12 +1149,20 @@ def get_simulation_profiles_realtime(simulation_id: str):
             }
         })
         
+    except InvalidIdError as e:
+        # 非法 ID 属于客户端错误，需在通用处理之前拦截，否则会被当成 500
+        logger.warning(f"实时获取Profile收到非法 ID: {simulation_id}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+
     except Exception as e:
         logger.error(f"实时获取Profile失败: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1176,9 +1192,10 @@ def get_simulation_config_realtime(simulation_id: str):
     """
     import json
     from datetime import datetime
-    
+
     try:
-        # 获取模拟目录
+        # 获取模拟目录（校验 ID，避免拼出存储目录之外的路径）
+        validate_id(simulation_id, 'simulation_id')
         sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
         
         if not os.path.exists(sim_dir):
@@ -1261,12 +1278,20 @@ def get_simulation_config_realtime(simulation_id: str):
             "data": response_data
         })
         
+    except InvalidIdError as e:
+        # 非法 ID 属于客户端错误，需在通用处理之前拦截，否则会被当成 500
+        logger.warning(f"实时获取Config收到非法 ID: {simulation_id}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+
     except Exception as e:
         logger.error(f"实时获取Config失败: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1302,7 +1327,7 @@ def get_simulation_config(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1331,7 +1356,7 @@ def download_simulation_config(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1383,7 +1408,7 @@ def download_simulation_script(script_name: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1457,7 +1482,7 @@ def generate_profiles():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1652,7 +1677,7 @@ def start_simulation():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1711,7 +1736,7 @@ def stop_simulation():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1771,7 +1796,7 @@ def get_run_status(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1872,7 +1897,7 @@ def get_run_status_detail(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1926,7 +1951,7 @@ def get_simulation_actions(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1966,7 +1991,7 @@ def get_simulation_timeline(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -1993,7 +2018,7 @@ def get_agent_stats(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2073,7 +2098,7 @@ def get_simulation_posts(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2148,7 +2173,7 @@ def get_simulation_comments(simulation_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2279,7 +2304,7 @@ def interview_agent():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2417,7 +2442,7 @@ def interview_agents_batch():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2520,7 +2545,7 @@ def interview_all_agents():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2592,7 +2617,7 @@ def get_interview_history():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2657,7 +2682,7 @@ def get_env_status():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -2727,5 +2752,5 @@ def close_simulation_env():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500

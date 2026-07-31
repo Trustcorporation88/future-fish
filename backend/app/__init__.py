@@ -42,8 +42,8 @@ def create_app(config_class=Config):
         logger.info("MiroFish Backend 启动中...")
         logger.info("=" * 50)
     
-    # 启用CORS
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # 启用CORS（来源由配置控制，见 Config.CORS_ORIGINS）
+    CORS(app, resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}})
     
     # 注册模拟进程清理函数（确保服务器关闭时终止所有模拟进程）
     from .services.simulation_runner import SimulationRunner
@@ -79,6 +79,16 @@ def create_app(config_class=Config):
     app.register_blueprint(news_bp)
     app.register_blueprint(quotes_bp)
     
+    # 非法 ID 统一按客户端错误处理：
+    # 多数路由没有 try/except，若不在这里拦截，校验异常会变成 500。
+    # 单个路由若已有自己的 except InvalidIdError 分支，会优先生效。
+    from .utils.ids import InvalidIdError
+
+    @app.errorhandler(InvalidIdError)
+    def handle_invalid_id(error):
+        get_logger('mirofish.request').warning(f"收到非法 ID: {error}")
+        return {'success': False, 'error': str(error)}, 400
+
     # 健康检查
     @app.route('/health')
     @app.route('/healthz')

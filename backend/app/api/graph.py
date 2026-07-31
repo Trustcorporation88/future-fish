@@ -18,6 +18,8 @@ from ..utils.logger import get_logger
 from ..utils.zep_errors import format_zep_error, verify_zep_api_key
 from ..utils.locale import t, get_locale, set_locale
 from ..utils.auth import role_required
+from ..utils.errors import report_exception
+from ..utils.ids import InvalidIdError
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
@@ -254,7 +256,7 @@ def generate_ontology():
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -538,12 +540,20 @@ def build_graph():
                 "message": t('api.graphBuildStarted', taskId=task_id)
             }
         })
-        
+
+    except InvalidIdError as e:
+        # 非法 project_id 属于客户端错误，需在通用处理之前拦截，否则会变成 500
+        logger.warning(f"构建图谱收到非法 project_id: {data.get('project_id')}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -608,7 +618,7 @@ def get_graph_data(graph_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
 
 
@@ -637,5 +647,5 @@ def delete_graph(graph_id: str):
         return jsonify({
             "success": False,
             "error": str(e),
-            "traceback": traceback.format_exc()
+            **report_exception()
         }), 500
