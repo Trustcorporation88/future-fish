@@ -15,6 +15,33 @@ from ..utils.ids import validate_id
 _PATH_ID_KEYS = ('project_id', 'simulation_id', 'report_id')
 
 
+class MalformedBodyError(ValueError):
+    """请求体声明为 JSON，但无法解析或不是对象"""
+
+
+def _json_body():
+    """
+    取出 JSON 请求体，非法时抛 MalformedBodyError
+
+    各路由统一写 `data = request.get_json(silent=True) or {}` 再 `data.get(...)`，
+    因此请求体若是数组或字符串（没有 .get），会在视图里抛 AttributeError，
+    被通用 except 吞成 500。在这里提前拦成 400，19 个路由一次性覆盖。
+
+    空请求体按 {} 放行：前端有些 POST 不带 body 却带着 JSON 头，
+    这类请求本来就能正常工作，不应该被这次改动破坏。
+    """
+    if not (request.content_type and 'json' in request.content_type):
+        return None
+
+    if not request.get_data():
+        return {}
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        raise MalformedBodyError("请求体必须是 JSON 对象")
+    return body
+
+
 def _validate_path_ids():
     """
     在进入视图之前校验请求中的 ID
@@ -26,11 +53,9 @@ def _validate_path_ids():
     只校验非空值：ID 缺失时各路由自己会返回更具体的提示。
     """
     sources = [request.view_args or {}, request.args]
-    if request.content_type and 'json' in request.content_type:
-        body = request.get_json(silent=True)
-        # 请求体可能是数组或字符串，此时没有 .get，交由路由自己处理
-        if isinstance(body, dict):
-            sources.append(body)
+    body = _json_body()
+    if body:
+        sources.append(body)
 
     for source in sources:
         for name in _PATH_ID_KEYS:

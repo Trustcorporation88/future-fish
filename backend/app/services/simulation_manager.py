@@ -19,7 +19,7 @@ from .entity_supplement import supplement_entities_from_context, MIN_ENTITIES_DE
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 from ..utils.locale import t
-from ..utils.ids import validate_id
+from ..utils.ids import validate_id, InvalidIdError
 
 logger = get_logger('mirofish.simulation')
 
@@ -493,12 +493,25 @@ class SimulationManager:
                 sim_path = os.path.join(self.SIMULATION_DATA_DIR, sim_id)
                 if sim_id.startswith('.') or not os.path.isdir(sim_path):
                     continue
-                
-                state = self._load_simulation_state(sim_id)
+
+                # 跳过不符合 ID 格式的目录（如手工复制出的 sim_x - Copy）：
+                # 这类名字会让下游拼路径时的校验抛异常，使整个列表接口失败
+                try:
+                    validate_id(sim_id, 'simulation_id')
+                except InvalidIdError:
+                    continue
+
+                # 状态文件可能在写入中途被截断，或字段值超出枚举范围。
+                # 单个模拟读不出来时跳过，不能让整个列表接口失败。
+                try:
+                    state = self._load_simulation_state(sim_id)
+                except (OSError, ValueError, KeyError) as e:
+                    logger.warning(f"跳过无法读取的模拟 {sim_id}: {e}")
+                    continue
+
                 if state:
                     if project_id is None or state.project_id == project_id:
-                        simulations.append(state)
-        
+                        simulations.append(state)        
         return simulations
     
     def get_profiles(self, simulation_id: str, platform: str = "reddit") -> List[Dict[str, Any]]:

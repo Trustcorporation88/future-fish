@@ -183,7 +183,7 @@ def search_news():
         }
     """
     try:
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         query = data.get('query', '')
         limit = data.get('limit', 10)
         

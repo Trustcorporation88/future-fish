@@ -22,7 +22,7 @@ from ..config import Config
 from ..utils.llm_client import LLMClient
 from ..utils.logger import get_logger
 from ..utils.locale import get_language_instruction, t
-from ..utils.ids import validate_id
+from ..utils.ids import validate_id, InvalidIdError
 from .zep_tools import (
     ZepToolsService, 
     SearchResult, 
@@ -2504,51 +2504,71 @@ class ReportManager:
         )
     
     @classmethod
+    def _iter_report_ids(cls):
+        """
+        遍历 reports 目录下的报告 ID（新格式为文件夹，旧格式为 JSON 文件）
+
+        跳过不符合 ID 格式的条目（如 .DS_Store、手工复制的备份目录）：
+        这类名字会让 _get_report_folder 的校验抛异常，使整个列表接口失败
+        """
+        for item in os.listdir(cls.REPORTS_DIR):
+            if os.path.isdir(os.path.join(cls.REPORTS_DIR, item)):
+                report_id = item
+            elif item.endswith('.json'):
+                report_id = item[:-5]
+            else:
+                continue
+
+            try:
+                validate_id(report_id, 'report_id')
+            except InvalidIdError:
+                continue
+
+            yield report_id
+
+    @classmethod
+    def _read_report_quietly(cls, report_id: str) -> Optional[Report]:
+        """
+        遍历时读取单份报告，读不出来就跳过
+
+        报告 JSON 可能在写入过程中被中断而截断，也可能字段缺失。
+        直接取某份报告时应当把错误抛给调用方，但列表接口不该因为
+        一份坏文件而整体失败——其余报告仍然要能列出来。
+        """
+        try:
+            return cls.get_report(report_id)
+        except (OSError, ValueError, KeyError) as e:
+            # ValueError 覆盖 JSONDecodeError 与状态枚举转换失败，KeyError 覆盖缺字段
+            logger.warning(f"跳过无法读取的报告 {report_id}: {e}")
+            return None
+
+    @classmethod
     def get_report_by_simulation(cls, simulation_id: str) -> Optional[Report]:
         """根据模拟ID获取报告"""
         cls._ensure_reports_dir()
-        
-        for item in os.listdir(cls.REPORTS_DIR):
-            item_path = os.path.join(cls.REPORTS_DIR, item)
-            # 新格式：文件夹
-            if os.path.isdir(item_path):
-                report = cls.get_report(item)
-                if report and report.simulation_id == simulation_id:
-                    return report
-            # 兼容旧格式：JSON文件
-            elif item.endswith('.json'):
-                report_id = item[:-5]
-                report = cls.get_report(report_id)
-                if report and report.simulation_id == simulation_id:
-                    return report
-        
+
+        for report_id in cls._iter_report_ids():
+            report = cls._read_report_quietly(report_id)
+            if report and report.simulation_id == simulation_id:
+                return report
+
         return None
-    
+
     @classmethod
     def list_reports(cls, simulation_id: Optional[str] = None, limit: int = 50) -> List[Report]:
         """列出报告"""
         cls._ensure_reports_dir()
-        
+
         reports = []
-        for item in os.listdir(cls.REPORTS_DIR):
-            item_path = os.path.join(cls.REPORTS_DIR, item)
-            # 新格式：文件夹
-            if os.path.isdir(item_path):
-                report = cls.get_report(item)
-                if report:
-                    if simulation_id is None or report.simulation_id == simulation_id:
-                        reports.append(report)
-            # 兼容旧格式：JSON文件
-            elif item.endswith('.json'):
-                report_id = item[:-5]
-                report = cls.get_report(report_id)
-                if report:
-                    if simulation_id is None or report.simulation_id == simulation_id:
-                        reports.append(report)
-        
+        for report_id in cls._iter_report_ids():
+            report = cls._read_report_quietly(report_id)
+            if report:
+                if simulation_id is None or report.simulation_id == simulation_id:
+                    reports.append(report)
+
         # 按创建时间倒序
         reports.sort(key=lambda r: r.created_at, reverse=True)
-        
+
         return reports[:limit]
     
     @classmethod
