@@ -69,7 +69,12 @@
     "promptPlaceholder": "// Describe your simulation or prediction requirement in natural language",
     "engineBadge": "Motor: Future Fish-V1.0",
     "startEngine": "Start Engine",
-    "initializing": "Initializing..."
+    "initializing": "Initializing...",
+    "invalidUrl": "URL inválida. Verifique se começa com http:// ou https://",
+    "noQuotesLoaded": "Nenhuma cotação carregada ainda. Clique em “Atualizar”.",
+    "noNewsLoaded": "Nenhuma notícia carregada ainda. Clique em “Atualizar”.",
+    "timeJustNow": "há menos de 1 min",
+    "timeMinutesAgo": "há {minutes} min"
   },
   "main": {
     "layoutGraph": "Grafo",
@@ -81,7 +86,13 @@
       "Executar simulação",
       "Geração do relatório",
       "Interação profunda"
-    ]
+    ],
+    "stepCounter": "Etapa {step}/{total}",
+    "statusError": "Erro",
+    "statusReady": "Pronto",
+    "statusBuildingGraph": "Construindo grafo",
+    "statusGeneratingOntology": "Gerando ontologia",
+    "statusInitializing": "Inicializando"
   },
   "step1": {
     "ontologyGeneration": "Geração de ontologia",
@@ -327,6 +338,15 @@
   "auth": {
     "missingCredentials": "Informe usuário e senha.",
     "invalidCredentials": "Usuário ou senha inválidos."
+  },
+  "login": {
+    "vipBadge": "◇ Acesso VIP",
+    "subtitle": "Cenários de previsão exclusivos para clientes autorizados.",
+    "username": "Usuário",
+    "password": "Senha",
+    "submit": "Entrar no VIP",
+    "submitting": "Entrando...",
+    "hint": "Admin e clientes usam a mesma tela. Credenciais são fornecidas pela Seliga Aqui."
   },
   "api": {
     "errorTimeout": "A requisição expirou. O servidor pode ainda estar processando — verifique o resultado em instantes.",
@@ -674,5 +694,12 @@
     "llmSelectAgentFailed": "LLM agent selection failed, using default selection: {error}",
     "generateInterviewQuestionsFailed": "Failed to generate interview questions: {error}",
     "generateInterviewSummaryFailed": "Failed to generate interview summary: {error}"
+  },
+  "a11y": {
+    "skipToContent": "Pular para o conteúdo principal",
+    "layoutSwitcher": "Layout",
+    "stepProgress": "Etapa {step} de {total}: {name}",
+    "languageSwitcher": "Idioma, atualmente {current}",
+    "languageMenu": "Escolher idioma"
   }
 }

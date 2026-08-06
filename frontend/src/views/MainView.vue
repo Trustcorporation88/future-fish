@@ -1,18 +1,27 @@
 <template>
   <div class="main-view">
+    <a class="skip-link" href="#main-content">{{ $t('a11y.skipToContent') }}</a>
+
     <!-- Header -->
     <header class="app-header">
       <div class="header-left">
-        <div class="brand" @click="router.push('/')">FUTURE FISH</div>
+        <button type="button" class="brand" @click="router.push('/')">FUTURE FISH</button>
       </div>
-      
+
       <div class="header-center">
-        <div class="view-switcher">
-          <button 
-            v-for="mode in ['graph', 'split', 'workbench']" 
+        <!--
+          原先是三个普通 button，读屏器听不出它们是一组互斥选项。
+          radiogroup 让当前布局可被播报，且方向键可切换。
+        -->
+        <div class="view-switcher" role="radiogroup" :aria-label="$t('a11y.layoutSwitcher')">
+          <button
+            v-for="mode in ['graph', 'split', 'workbench']"
             :key="mode"
+            type="button"
+            role="radio"
             class="switch-btn"
             :class="{ active: viewMode === mode }"
+            :aria-checked="viewMode === mode ? 'true' : 'false'"
             @click="viewMode = mode"
           >
             {{ { graph: $t('main.layoutGraph'), split: $t('main.layoutSplit'), workbench: $t('main.layoutWorkbench') }[mode] }}
@@ -22,21 +31,30 @@
 
       <div class="header-right">
         <LanguageSwitcher />
-        <div class="step-divider"></div>
-        <div class="workflow-step">
-          <span class="step-num">Etapa {{ currentStep }}/5</span>
+        <div class="step-divider" aria-hidden="true"></div>
+        <div
+          class="workflow-step"
+          role="progressbar"
+          aria-valuemin="1"
+          aria-valuemax="5"
+          :aria-valuenow="currentStep"
+          :aria-valuetext="$t('a11y.stepProgress', { step: currentStep, total: 5, name: $tm('main.stepNames')[currentStep - 1] })"
+        >
+          <span class="step-num">{{ $t('main.stepCounter', { step: currentStep, total: 5 }) }}</span>
           <span class="step-name">{{ $tm('main.stepNames')[currentStep - 1] }}</span>
         </div>
-        <div class="step-divider"></div>
-        <span class="status-indicator" :class="statusClass">
-          <span class="dot"></span>
+        <div class="step-divider" aria-hidden="true"></div>
+        <!-- 状态变化要被播报，但不该打断当前朗读，故用 polite -->
+        <span class="status-indicator" :class="statusClass" role="status" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
           {{ statusText }}
         </span>
       </div>
     </header>
 
     <!-- Main Content Area -->
-    <main class="content-area">
+    <!-- tabindex="-1"：没有它，部分浏览器只滚动而不移动焦点，跳转链接对键盘用户等于无效 -->
+    <main class="content-area" id="main-content" tabindex="-1">
       <!-- Left Panel: Graph -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
         <GraphPanel 
@@ -135,11 +153,11 @@ const statusClass = computed(() => {
 })
 
 const statusText = computed(() => {
-  if (error.value) return 'Erro'
-  if (currentPhase.value >= 2) return 'Pronto'
-  if (currentPhase.value === 1) return 'Construindo grafo'
-  if (currentPhase.value === 0) return 'Gerando ontologia'
-  return 'Inicializando'
+  if (error.value) return t('main.statusError')
+  if (currentPhase.value >= 2) return t('main.statusReady')
+  if (currentPhase.value === 1) return t('main.statusBuildingGraph')
+  if (currentPhase.value === 0) return t('main.statusGeneratingOntology')
+  return t('main.statusInitializing')
 })
 
 // --- Helpers ---
@@ -468,8 +486,14 @@ onUnmounted(() => {
   transform: translateX(-50%);
 }
 
+/* 由 div 改为 button 以便键盘可达；下面这些声明抵消浏览器默认按钮外观，
+   视觉上与改动前完全一致。 */
 .brand {
-  font-family: 'JetBrains Mono', monospace;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: var(--font-mono);
   font-weight: 800;
   font-size: 18px;
   letter-spacing: 1px;

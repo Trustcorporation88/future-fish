@@ -69,13 +69,30 @@
     "promptPlaceholder": "// Describe your simulation or prediction requirement in natural language",
     "engineBadge": "Engine: MiroFish-V1.0",
     "startEngine": "Start Engine",
-    "initializing": "Initializing..."
+    "initializing": "Initializing...",
+    "invalidUrl": "Invalid URL. Make sure it starts with http:// or https://",
+    "noQuotesLoaded": "No quotes loaded yet. Click \"Refresh\".",
+    "noNewsLoaded": "No news loaded yet. Click \"Refresh\".",
+    "timeJustNow": "less than 1 min ago",
+    "timeMinutesAgo": "{minutes} min ago"
   },
   "main": {
     "layoutGraph": "Graph",
     "layoutSplit": "Split",
     "layoutWorkbench": "Workbench",
-    "stepNames": ["Graph Build", "Env Setup", "Run Simulation", "Report Generation", "Deep Interaction"]
+    "stepNames": [
+      "Graph Build",
+      "Env Setup",
+      "Run Simulation",
+      "Report Generation",
+      "Deep Interaction"
+    ],
+    "stepCounter": "Step {step}/{total}",
+    "statusError": "Error",
+    "statusReady": "Ready",
+    "statusBuildingGraph": "Building graph",
+    "statusGeneratingOntology": "Generating ontology",
+    "statusInitializing": "Initializing"
   },
   "step1": {
     "ontologyGeneration": "Ontology Generation",
@@ -321,6 +338,15 @@
   "auth": {
     "missingCredentials": "Username and password are required.",
     "invalidCredentials": "Invalid username or password."
+  },
+  "login": {
+    "vipBadge": "◇ VIP Access",
+    "subtitle": "Forecast scenarios exclusive to authorized clients.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Enter VIP",
+    "submitting": "Signing in...",
+    "hint": "Admins and clients use the same screen. Credentials are provided by Seliga Aqui."
   },
   "api": {
     "errorTimeout": "Request timed out. The server may still be processing it — check back shortly.",
@@ -668,5 +694,12 @@
     "llmSelectAgentFailed": "LLM agent selection failed, using default selection: {error}",
     "generateInterviewQuestionsFailed": "Failed to generate interview questions: {error}",
     "generateInterviewSummaryFailed": "Failed to generate interview summary: {error}"
+  },
+  "a11y": {
+    "skipToContent": "Skip to main content",
+    "layoutSwitcher": "Layout",
+    "stepProgress": "Step {step} of {total}: {name}",
+    "languageSwitcher": "Language, currently {current}",
+    "languageMenu": "Choose language"
   }
 }
