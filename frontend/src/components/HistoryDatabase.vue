@@ -109,17 +109,26 @@
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="selectedProject" class="modal-overlay" @click.self="closeModal">
-          <div class="modal-content">
+          <div
+            ref="dialogRef"
+            class="modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-modal-title"
+            tabindex="-1"
+          >
             <!-- 弹窗头部 -->
             <div class="modal-header">
               <div class="modal-title-section">
-                <span class="modal-id">{{ formatSimulationId(selectedProject.simulation_id) }}</span>
+                <span id="history-modal-title" class="modal-id">{{ formatSimulationId(selectedProject.simulation_id) }}</span>
                 <span class="modal-progress" :class="getProgressClass(selectedProject)">
-                  <span class="status-dot">●</span> {{ formatRounds(selectedProject) }}
+                  <span class="status-dot" aria-hidden="true">●</span> {{ formatRounds(selectedProject) }}
                 </span>
                 <span class="modal-create-time">{{ formatDate(selectedProject.created_at) }} {{ formatTime(selectedProject.created_at) }}</span>
               </div>
-              <button class="modal-close" @click="closeModal">×</button>
+              <button class="modal-close" :aria-label="$t('common.close')" @click="closeModal">
+                <span aria-hidden="true">×</span>
+              </button>
             </div>
 
             <!-- 弹窗内容 -->
@@ -195,6 +204,7 @@ import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } f
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { getSimulationHistory } from '../api/simulation'
+import { useDialog } from '../composables/useDialog'
 
 const router = useRouter()
 const route = useRoute()
@@ -402,6 +412,9 @@ const navigateToProject = (simulation) => {
 const closeModal = () => {
   selectedProject.value = null
 }
+
+// Esc 关闭、焦点锁定在弹窗内、关闭后焦点归还触发元素
+const dialogRef = useDialog(() => selectedProject.value !== null, closeModal)
 
 // 导航到图谱构建页面（Project）
 const goToProject = () => {

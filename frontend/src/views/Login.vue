@@ -1,29 +1,48 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <div class="vip-badge">◇ Acesso VIP</div>
+      <div class="vip-badge">{{ t('login.vipBadge') }}</div>
       <h1>Future Fish</h1>
-      <p class="subtitle">Cenários de previsão exclusivos para clientes autorizados.</p>
+      <p class="subtitle">{{ t('login.subtitle') }}</p>
 
       <form @submit.prevent="handleLogin">
-        <label>
-          <span>Usuário</span>
-          <input v-model="username" type="text" autocomplete="username" required />
+        <!-- label 同时包裹控件并带 for：包裹保持原有布局，
+             for/id 让关联对所有读屏器都显式可见 -->
+        <label for="login-username">
+          <span>{{ t('login.username') }}</span>
+          <input
+            id="login-username"
+            v-model="username"
+            type="text"
+            autocomplete="username"
+            required
+            :aria-invalid="error ? 'true' : 'false'"
+            :aria-describedby="error ? 'login-error' : undefined"
+          />
         </label>
-        <label>
-          <span>Senha</span>
-          <input v-model="password" type="password" autocomplete="current-password" required />
+        <label for="login-password">
+          <span>{{ t('login.password') }}</span>
+          <input
+            id="login-password"
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            :aria-invalid="error ? 'true' : 'false'"
+            :aria-describedby="error ? 'login-error' : undefined"
+          />
         </label>
 
-        <p v-if="error" class="error">{{ error }}</p>
+        <!-- role="alert" 让登录失败被立即播报，而不是静默地只有视觉变化 -->
+        <p v-if="error" id="login-error" class="error" role="alert">{{ error }}</p>
 
         <button type="submit" class="submit-btn" :disabled="loading">
-          {{ loading ? 'Entrando...' : 'Entrar no VIP' }}
+          {{ loading ? t('login.submitting') : t('login.submit') }}
         </button>
       </form>
 
       <p class="hint">
-        Admin e clientes usam a mesma tela. Credenciais são fornecidas pela Seliga Aqui.
+        {{ t('login.hint') }}
       </p>
     </div>
   </div>
@@ -32,10 +51,12 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import auth from '../store/auth'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 
 const username = ref('')
 const password = ref('')
@@ -50,7 +71,8 @@ const handleLogin = async () => {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     router.replace(redirect)
   } catch (e) {
-    error.value = e.message || 'Usuário ou senha inválidos.'
+    // e.message 已由后端按当前语言翻译；仅在缺失时才用本地兜底
+    error.value = e.message || t('auth.invalidCredentials')
   } finally {
     loading.value = false
   }

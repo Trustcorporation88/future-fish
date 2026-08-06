@@ -1,0 +1,117 @@
+/**
+ * Design tokens
+ *
+ * 这些变量原先定义在 Home.vue 的 <style scoped> 里。Vue 的编译器不会给
+ * :root 加 data-v-* 后缀，所以它们“恰好”是全局的 —— 但前提是 Home.vue
+ * 必须在 CSS 依赖图里。移到独立文件是修正这个结构问题。
+ *
+ * 取值全部沿用各组件中已在使用的字面量，因此引入这一层不改变任何视觉表现。
+ * 迁移是渐进的：仍有约 1000 处 hex 字面量散落在各组件，逐步替换。
+ */
+
+:root {
+  /* ---- 品牌色 ---- */
+  --color-black: #000000;
+  --color-white: #ffffff;
+  --color-orange: #ff4500;
+  --color-orange-alt: #ff6b35;  /* Home/Step 组件里的次级强调色 */
+
+  /* ---- 中性色 ----
+     两套灰阶原先并存：Tailwind 风格的 #6b7280 系与随手写的 #666 系。
+     此处以 Tailwind 系为准，把 #333/#666/#999 映射进同一阶梯。 */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  /* ---- 语义色 ---- */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* ---- 表面与边框 ---- */
+  --surface-base: var(--color-white);
+  --surface-muted: var(--color-gray-50);
+  --surface-inverse: var(--color-black);
+  --border-default: var(--color-gray-200);
+  --border-strong: var(--color-gray-300);
+
+  /* ---- 文字 ---- */
+  --text-primary: var(--color-black);
+  --text-secondary: var(--color-gray-500);
+  --text-muted: var(--color-gray-400);
+  --text-inverse: var(--color-white);
+
+  /* ---- 字体 ---- */
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  --font-sans: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
+  --font-cn: 'Noto Sans SC', system-ui, sans-serif;
+
+  /* ---- 字号 ---- */
+  --text-xs: 0.72rem;
+  --text-sm: 0.8rem;
+  --text-base: 0.9rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.6rem;
+  --text-2xl: 2rem;
+
+  /* ---- 间距（4px 基准）---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 60px;
+
+  /* ---- 圆角 ----
+     主界面是硬边风格（无圆角），仅 Login 与浮层用到圆角 */
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ---- 阴影 ---- */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.45);
+
+  /* ---- 动效 ---- */
+  --duration-fast: 0.15s;
+  --duration-base: 0.2s;
+  --duration-slow: 0.5s;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* ---- 焦点环 ----
+     此前 17 个文件里只有 3 个写了 :focus，键盘导航几乎不可见。
+     用橙色品牌色 + 白色内环，保证在黑色页头与白色内容区都能看清。 */
+  --focus-ring: 0 0 0 2px var(--color-white), 0 0 0 4px var(--color-orange);
+  --focus-ring-inverse: 0 0 0 2px var(--color-black), 0 0 0 4px var(--color-orange);
+  --focus-ring-offset: 2px;
+
+  /* ---- 层级 ---- */
+  --z-dropdown: 1000;
+  --z-modal: 2000;
+  --z-toast: 3000;
+}
+
+/* 兼容旧变量名：Home.vue 与 Step 组件里已有 60+ 处引用，
+   保留别名以免这次改动牵连到尚未迁移的文件。 */
+:root {
+  --black: var(--color-black);
+  --white: var(--color-white);
+  --orange: var(--color-orange);
+  --gray-light: #f5f5f5;
+  --gray-text: #666666;
+  --border: #e5e5e5;
+}

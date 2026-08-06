@@ -101,7 +101,7 @@
               </div>
             </div>
             <div v-else class="empty-market">
-              Nenhuma cotação carregada ainda. Clique em “Atualizar”.
+              {{ $t('home.noQuotesLoaded') }}
             </div>
           </div>
 
@@ -116,7 +116,7 @@
               </a>
             </div>
             <div v-else class="empty-market">
-              Nenhuma notícia carregada ainda. Clique em “Atualizar”.
+              {{ $t('home.noNewsLoaded') }}
             </div>
           </div>
 
@@ -306,13 +306,16 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import auth from '../store/auth'
 import service from '../api/index'
+import { toastError } from '../store/toast'
 
 const router = useRouter()
 const route = useRoute()
+const { t, locale } = useI18n()
 
 const handleLogout = () => {
   auth.logout()
@@ -447,7 +450,7 @@ const addUrl = () => {
       new URL(url)
       urls.value.push(url)
     } catch {
-      alert('URL inválida. Verifique se começa com http:// ou https://')
+      toastError(t('home.invalidUrl'))
       return
     }
   } else {
@@ -502,9 +505,9 @@ const formatMarketUpdated = (iso) => {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   const diffSec = Math.floor((Date.now() - d.getTime()) / 1000)
-  if (diffSec < 60) return 'há menos de 1 min'
-  if (diffSec < 3600) return `há ${Math.floor(diffSec / 60)} min`
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  if (diffSec < 60) return t('home.timeJustNow')
+  if (diffSec < 3600) return t('home.timeMinutesAgo', { minutes: Math.floor(diffSec / 60) })
+  return d.toLocaleTimeString(locale.value === 'zh' ? 'zh-CN' : locale.value === 'en' ? 'en-US' : 'pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 const buildMarketContext = () => {

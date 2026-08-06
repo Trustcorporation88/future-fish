@@ -69,13 +69,30 @@
     "promptPlaceholder": "// 用自然语言输入模拟或预测需求（例.武大若发布撤销肖某处分的公告，会引发什么舆情走向）",
     "engineBadge": "引擎: MiroFish-V1.0",
     "startEngine": "启动引擎",
-    "initializing": "初始化中..."
+    "initializing": "初始化中...",
+    "invalidUrl": "网址无效，请确认以 http:// 或 https:// 开头。",
+    "noQuotesLoaded": "尚未加载行情。请点击“刷新”。",
+    "noNewsLoaded": "尚未加载新闻。请点击“刷新”。",
+    "timeJustNow": "不到 1 分钟前",
+    "timeMinutesAgo": "{minutes} 分钟前"
   },
   "main": {
     "layoutGraph": "图谱",
     "layoutSplit": "双栏",
     "layoutWorkbench": "工作台",
-    "stepNames": ["图谱构建", "环境搭建", "开始模拟", "报告生成", "深度互动"]
+    "stepNames": [
+      "图谱构建",
+      "环境搭建",
+      "开始模拟",
+      "报告生成",
+      "深度互动"
+    ],
+    "stepCounter": "第 {step}/{total} 步",
+    "statusError": "错误",
+    "statusReady": "就绪",
+    "statusBuildingGraph": "构建图谱中",
+    "statusGeneratingOntology": "生成本体中",
+    "statusInitializing": "初始化中"
   },
   "step1": {
     "ontologyGeneration": "本体生成",
@@ -317,6 +334,19 @@
     "roundsProgress": "{current}/{total} 轮",
     "untitledSimulation": "未命名模拟",
     "unknownFile": "未知文件"
+  },
+  "auth": {
+    "missingCredentials": "请输入用户名和密码。",
+    "invalidCredentials": "用户名或密码错误。"
+  },
+  "login": {
+    "vipBadge": "◇ VIP 通道",
+    "subtitle": "仅向授权客户开放的预测场景。",
+    "username": "用户名",
+    "password": "密码",
+    "submit": "进入 VIP",
+    "submitting": "登录中...",
+    "hint": "管理员与客户共用此登录页。账号由 Seliga Aqui 提供。"
   },
   "api": {
     "errorTimeout": "请求超时，服务端可能仍在处理，请稍后查看结果",
@@ -663,5 +693,12 @@
     "llmSelectAgentFailed": "LLM选择Agent失败，使用默认选择: {error}",
     "generateInterviewQuestionsFailed": "生成采访问题失败: {error}",
     "generateInterviewSummaryFailed": "生成采访摘要失败: {error}"
+  },
+  "a11y": {
+    "skipToContent": "跳至主内容",
+    "layoutSwitcher": "布局切换",
+    "stepProgress": "第 {step} 步，共 {total} 步：{name}",
+    "languageSwitcher": "语言，当前为 {current}",
+    "languageMenu": "选择语言"
   }
 }

@@ -530,17 +530,26 @@
 
     <!-- Profile Detail Modal -->
     <Transition name="modal">
-      <div v-if="selectedProfile" class="profile-modal-overlay" @click.self="selectedProfile = null">
-        <div class="profile-modal">
+      <div v-if="selectedProfile" class="profile-modal-overlay" @click.self="closeProfileModal">
+        <div
+          ref="profileDialogRef"
+          class="profile-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-modal-title"
+          tabindex="-1"
+        >
           <div class="modal-header">
           <div class="modal-header-info">
             <div class="modal-name-row">
-              <span class="modal-realname">{{ selectedProfile.username }}</span>
+              <span id="profile-modal-title" class="modal-realname">{{ selectedProfile.username }}</span>
               <span class="modal-username">@{{ selectedProfile.name }}</span>
             </div>
             <span class="modal-profession">{{ selectedProfile.profession }}</span>
           </div>
-          <button class="close-btn" @click="selectedProfile = null">×</button>
+          <button class="close-btn" :aria-label="$t('common.close')" @click="closeProfileModal">
+            <span aria-hidden="true">×</span>
+          </button>
         </div>
         
         <div class="modal-body">
@@ -642,6 +651,7 @@ import {
   getSimulationConfig,
   getSimulationConfigRealtime
 } from '../api/simulation'
+import { useDialog } from '../composables/useDialog'
 
 const { t } = useI18n()
 
@@ -768,6 +778,13 @@ const truncateBio = (bio) => {
 const selectProfile = (profile) => {
   selectedProfile.value = profile
 }
+
+const closeProfileModal = () => {
+  selectedProfile.value = null
+}
+
+// Esc 关闭、焦点锁定在弹窗内、关闭后焦点归还触发元素
+const profileDialogRef = useDialog(() => selectedProfile.value !== null, closeProfileModal)
 
 // 自动开始准备模拟
 const startPrepareSimulation = async (force = false) => {

@@ -1,0 +1,120 @@
+/**
+ * 全局基础样式
+ *
+ * 内容原先在 App.vue 的非 scoped <style> 里，连同重置一起搬到这里，
+ * 让 App.vue 只负责结构。新增的是焦点环、减弱动效与 .sr-only 工具类。
+ */
+
+/* ---- 重置（原样迁自 App.vue）---- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+#app {
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text-primary);
+  background-color: var(--surface-base);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ---- 滚动条（原样迁自 App.vue）---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-black);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-700);
+}
+
+/* ---- 焦点可见性 ----
+   用 :focus-visible 而非 :focus：鼠标点击不会留下焦点环，
+   键盘 Tab 才会，因此不影响原有的鼠标操作观感。 */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* 深色背景（页头、Login）上换用反色内环，否则白环会糊在深色里 */
+.app-header :focus-visible,
+.navbar :focus-visible,
+.login-page :focus-visible {
+  box-shadow: var(--focus-ring-inverse);
+}
+
+/* 不支持 :focus-visible 的浏览器仍然要看得见焦点 */
+@supports not selector(:focus-visible) {
+  :focus {
+    outline: 2px solid var(--color-orange);
+    outline-offset: var(--focus-ring-offset);
+  }
+}
+
+/* ---- 减弱动效 ----
+   图谱面板与步骤切换有大量 transition，对前庭敏感用户不友好。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- 仅供读屏的文本 ----
+   用于给纯图标按钮补可访问名称，视觉上不占位。 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 跳至主内容：Tab 第一下就能跳过页头，
+   平时藏在视口外，获得焦点时才出现。 */
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-black);
+  color: var(--color-white);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* 跳转目标是整块主内容区，套上焦点环会画出一圈横跨视口的边框。
+   焦点本身仍然移动过去了（读屏器与后续 Tab 都从这里继续），只是不描边。 */
+#main-content:focus-visible {
+  box-shadow: none;
+}
