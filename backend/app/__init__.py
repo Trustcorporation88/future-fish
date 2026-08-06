@@ -89,6 +89,15 @@ def create_app(config_class=Config):
         get_logger('mirofish.request').warning(f"收到非法 ID: {error}")
         return {'success': False, 'error': str(error)}, 400
 
+    # 请求体不是 JSON 对象时同样按客户端错误处理：
+    # 各路由拿到数组/字符串后调用 .get 会抛 AttributeError，进而变成 500。
+    from .api.guards import MalformedBodyError
+
+    @app.errorhandler(MalformedBodyError)
+    def handle_malformed_body(error):
+        get_logger('mirofish.request').warning(f"收到非法请求体: {error}")
+        return {'success': False, 'error': str(error)}, 400
+
     # 健康检查
     @app.route('/health')
     @app.route('/healthz')
