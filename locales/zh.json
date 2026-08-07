@@ -450,6 +450,7 @@
     "connectingZepGraph": "正在连接Zep图谱...",
     "readingNodeData": "正在读取节点数据...",
     "readingComplete": "完成，共 {count} 个实体",
+    "noGraphEntities": "图谱中没有找到实体。请重新构建图谱或开始新的场景。",
     "startGenerating": "开始生成...",
     "analyzingRequirements": "正在分析模拟需求...",
     "generatingOutline": "正在生成报告大纲...",
