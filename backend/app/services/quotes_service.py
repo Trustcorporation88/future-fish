@@ -24,47 +24,71 @@ class QuotesService:
         'sp500': {'symbol': '^GSPC', 'name': 'S&P 500', 'source': 'yahoo', 'type': 'index', 'currency': 'USD'},
         'dowjones': {'symbol': '^DJI', 'name': 'Dow Jones', 'source': 'yahoo', 'type': 'index', 'currency': 'USD'},
         'ibovespa': {'symbol': '^BVSP', 'name': 'IBOVESPA', 'source': 'brapi_yahoo_fallback', 'type': 'index', 'currency': 'BRL'},
-        'dolar': {'symbol': 'USD-BRL', 'name': 'Dólar/Real', 'source': 'brapi_currency', 'type': 'currency', 'currency': 'BRL'},
+        'dolar': {'symbol': 'USD-BRL', 'name': 'Dólar/Real', 'source': 'brapi_currency', 'type': 'currency', 'currency': 'BRL', 'yahoo_symbol': 'USDBRL=X'},
         'brent': {'symbol': 'BZ=F', 'name': 'Petróleo Brent', 'source': 'yahoo', 'type': 'commodity', 'currency': 'USD'},
         'ouro': {'symbol': 'GC=F', 'name': 'Ouro (USD/onça)', 'source': 'yahoo', 'type': 'commodity', 'currency': 'USD'},
         'bitcoin': {'symbol': 'BTC', 'name': 'Bitcoin', 'source': 'crypto', 'type': 'crypto', 'currency': 'USD'}
     }
 
+    # Ordered source chains. The next source is tried whenever the previous one
+    # raises or comes back without a price, so a single upstream outage (BRAPI
+    # timing out, Finnhub rate limiting) never takes a quote off the board.
+    SOURCE_CHAINS = {
+        'finnhub': ['finnhub'],
+        'yahoo': ['yahoo'],
+        'brapi': ['brapi'],
+        'crypto': ['crypto'],
+        'finnhub_yahoo_fallback': ['finnhub', 'yahoo'],
+        'brapi_yahoo_fallback': ['brapi', 'yahoo'],
+        'brapi_currency': ['brapi_currency', 'awesome_currency', 'yahoo']
+    }
+
     @staticmethod
     def fetch_quote(quote_key: str) -> Optional[Dict]:
-        """Fetch a single quote by key."""
+        """Fetch a single quote by key, trying each source in its chain until one works."""
         quote_info = QuotesService.QUOTES.get(quote_key)
         if not quote_info:
             logger.error(f"Unknown quote key: {quote_key}")
             return None
 
-        source = quote_info['source']
-        try:
-            if source == 'finnhub':
-                return QuotesService._fetch_finnhub_quote(quote_key, quote_info)
-            if source == 'yahoo':
-                return QuotesService._fetch_yahoo_quote(quote_key, quote_info)
-            if source == 'finnhub_yahoo_fallback':
-                quote = QuotesService._fetch_finnhub_quote(quote_key, quote_info)
-                if quote:
-                    return quote
-                yahoo_quote_info = {**quote_info, 'symbol': 'GC=F'}
-                return QuotesService._fetch_yahoo_quote(quote_key, yahoo_quote_info)
-            if source == 'brapi':
-                return QuotesService._fetch_brapi_quote(quote_key, quote_info)
-            if source == 'brapi_yahoo_fallback':
-                quote = QuotesService._fetch_brapi_quote(quote_key, quote_info)
-                return quote or QuotesService._fetch_yahoo_quote(quote_key, quote_info)
-            if source == 'brapi_currency':
-                return QuotesService._fetch_brapi_currency(quote_key, quote_info)
-            if source == 'crypto':
-                return QuotesService._fetch_crypto_quote(quote_key, quote_info)
+        chain = QuotesService.SOURCE_CHAINS.get(quote_info['source'])
+        if not chain:
+            logger.error(f"Unknown quote source: {quote_info['source']}")
+            return None
 
-            logger.error(f"Unknown quote source: {source}")
-            return None
-        except Exception as e:
-            logger.error(f"Error fetching quote {quote_key}: {str(e)}")
-            return None
+        for source in chain:
+            try:
+                result = QuotesService._fetch_from_source(source, quote_key, quote_info)
+            except Exception as e:
+                logger.warning(f"Source {source} failed for {quote_key}: {str(e)}")
+                continue
+
+            if result and result.get('price') is not None:
+                return result
+            logger.warning(f"Source {source} returned no price for {quote_key}")
+
+        logger.error(f"All sources exhausted for quote {quote_key}")
+        return None
+
+    @staticmethod
+    def _fetch_from_source(source: str, quote_key: str, quote_info: Dict) -> Optional[Dict]:
+        """Dispatch a single source attempt. Raises whatever the underlying fetcher raises."""
+        if source == 'finnhub':
+            return QuotesService._fetch_finnhub_quote(quote_key, quote_info)
+        if source == 'yahoo':
+            # Symbols differ per provider: BRAPI wants USD-BRL, Yahoo wants USDBRL=X.
+            yahoo_info = {**quote_info, 'symbol': quote_info.get('yahoo_symbol', quote_info['symbol'])}
+            return QuotesService._fetch_yahoo_quote(quote_key, yahoo_info)
+        if source == 'brapi':
+            return QuotesService._fetch_brapi_quote(quote_key, quote_info)
+        if source == 'brapi_currency':
+            return QuotesService._fetch_brapi_currency(quote_key, quote_info)
+        if source == 'awesome_currency':
+            return QuotesService._fetch_awesome_currency(quote_key, quote_info)
+        if source == 'crypto':
+            return QuotesService._fetch_crypto_quote(quote_key, quote_info)
+
+        raise ValueError(f"Unknown quote source: {source}")
 
     @staticmethod
     def fetch_all_quotes() -> List[Dict]:
@@ -161,49 +185,45 @@ class QuotesService:
 
     @staticmethod
     def _fetch_brapi_currency(quote_key: str, quote_info: Dict) -> Optional[Dict]:
-        """Fetch currency quote from BRAPI, with AwesomeAPI fallback."""
+        """Fetch currency quote from BRAPI. Fallbacks are handled by the source chain."""
         if not QuotesService.BRAPI_TOKEN:
             logger.warning("BRAPI token not configured")
-            return QuotesService._fetch_awesome_currency(quote_key, quote_info)
+            return None
 
-        try:
-            response = requests.get(
-                'https://brapi.dev/api/v2/currency',
-                params={'currency': quote_info['symbol'], 'token': QuotesService.BRAPI_TOKEN},
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-            currency_data = data.get('currency') or []
-            if not currency_data:
-                logger.warning(f"No BRAPI currency data for {quote_info['symbol']}: {data}")
-                return QuotesService._fetch_awesome_currency(quote_key, quote_info)
+        response = requests.get(
+            'https://brapi.dev/api/v2/currency',
+            params={'currency': quote_info['symbol'], 'token': QuotesService.BRAPI_TOKEN},
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        currency_data = data.get('currency') or []
+        if not currency_data:
+            logger.warning(f"No BRAPI currency data for {quote_info['symbol']}: {data}")
+            return None
 
-            item = currency_data[0]
-            price = item.get('bidPrice') or item.get('askPrice')
-            return {
-                'key': quote_key,
-                'symbol': quote_info['symbol'],
-                'name': quote_info['name'],
-                'price': float(price) if price is not None else None,
-                'high': float(item['high']) if item.get('high') is not None else None,
-                'low': float(item['low']) if item.get('low') is not None else None,
-                'open': None,
-                'previous_close': None,
-                'change': float(item['bidVariation']) if item.get('bidVariation') is not None else None,
-                'change_percent': float(item['pctChange']) if item.get('pctChange') is not None else None,
-                'timestamp': datetime.now().isoformat(),
-                'source': 'brapi',
-                'type': quote_info['type'],
-                'currency': quote_info['currency']
-            }
-        except Exception as e:
-            logger.warning(f"BRAPI currency failed for {quote_info['symbol']}: {str(e)}")
-            return QuotesService._fetch_awesome_currency(quote_key, quote_info)
+        item = currency_data[0]
+        price = item.get('bidPrice') or item.get('askPrice')
+        return {
+            'key': quote_key,
+            'symbol': quote_info['symbol'],
+            'name': quote_info['name'],
+            'price': float(price) if price is not None else None,
+            'high': float(item['high']) if item.get('high') is not None else None,
+            'low': float(item['low']) if item.get('low') is not None else None,
+            'open': None,
+            'previous_close': None,
+            'change': float(item['bidVariation']) if item.get('bidVariation') is not None else None,
+            'change_percent': float(item['pctChange']) if item.get('pctChange') is not None else None,
+            'timestamp': datetime.now().isoformat(),
+            'source': 'brapi',
+            'type': quote_info['type'],
+            'currency': quote_info['currency']
+        }
 
     @staticmethod
     def _fetch_awesome_currency(quote_key: str, quote_info: Dict) -> Optional[Dict]:
-        """Fallback currency quote from AwesomeAPI."""
+        """Currency quote from AwesomeAPI, used when BRAPI is unavailable."""
         response = requests.get(
             'https://economia.awesomeapi.com.br/json/last/USD-BRL',
             timeout=10
