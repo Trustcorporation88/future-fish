@@ -49,8 +49,10 @@
   --text-muted: var(--color-gray-400);
   --text-inverse: var(--color-white);
 
-  /* ---- 字体 ---- */
-  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+  /* ---- 字体 ----
+     等宽栈末尾补 Noto Sans SC：字体回退是逐字形的，拉丁字母与数字仍走
+     JetBrains Mono，只有它没有的汉字才落到这里，不会掉进系统衬线。 */
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Noto Sans SC', monospace;
   --font-sans: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   --font-cn: 'Noto Sans SC', system-ui, sans-serif;
 
