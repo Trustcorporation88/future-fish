@@ -274,6 +274,22 @@
                   ✓ Adicionar
                 </button>
               </div>
+              <div class="examples">
+                <span class="examples-label">Exemplos de reportagem / fonte:</span>
+                <div class="examples-list">
+                  <button
+                    v-for="source in exampleSources"
+                    :key="source.url"
+                    type="button"
+                    class="example-chip"
+                    :disabled="loading"
+                    :title="source.url"
+                    @click="useExampleSource(source)"
+                  >
+                    {{ source.label }}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- 分割线 -->
@@ -297,6 +313,22 @@
                   rows="6"
                   :disabled="loading"
                 ></textarea>
+              </div>
+              <div class="examples">
+                <span class="examples-label">Exemplos de pergunta:</span>
+                <div class="examples-list stacked">
+                  <button
+                    v-for="question in exampleQuestions"
+                    :key="question"
+                    type="button"
+                    class="example-chip"
+                    :disabled="loading"
+                    :title="question"
+                    @click="useExampleQuestion(question)"
+                  >
+                    {{ question }}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -350,6 +382,21 @@ const formData = ref({
 // 文件列表和 URLs
 const files = ref([])
 const urls = ref([])
+
+// 首页示例。新用户看到空白输入框不知道要写什么粒度的问题 ——
+// 这几条示例都带上了标的、时间窗口和约束，照抄就能跑出像样的预测。
+const exampleQuestions = [
+  'Analise o impacto das notícias e cotações de hoje no IBOVESPA, no dólar e no Bitcoin para as próximas 24 horas.',
+  'Como o mercado deve reagir à próxima decisão de juros do Copom? Projete o efeito sobre o dólar e as ações de bancos na semana seguinte.',
+  'A partir das notícias desta semana sobre a Petrobras, preveja a reação de investidores e da mídia ao próximo balanço trimestral.'
+]
+
+// 示例来源：选大机构的稳定栏目页，链接不容易失效
+const exampleSources = [
+  { label: 'Reuters — Mercados', url: 'https://www.reuters.com/markets/' },
+  { label: 'InfoMoney — Mercados', url: 'https://www.infomoney.com.br/mercados/' },
+  { label: 'Banco Central — Notas à imprensa', url: 'https://www.bcb.gov.br/detalhenoticia' }
+]
 
 // 状态
 const loading = ref(false)
@@ -478,6 +525,19 @@ const addUrl = () => {
   }
   
   formData.value.urlInput = ''
+}
+
+// 点示例问题直接填进输入框，覆盖已有内容 —— 用户点它就是想换一个问题
+const useExampleQuestion = (question) => {
+  if (loading.value) return
+  formData.value.simulationRequirement = question
+}
+
+// 示例来源直接进列表，省掉再点一次"Adicionar"
+const useExampleSource = (source) => {
+  if (loading.value) return
+  if (urls.value.includes(source.url)) return
+  urls.value.push(source.url)
 }
 
 const loadMarketData = async () => {
@@ -1641,6 +1701,70 @@ watch(
 .url-add-btn:disabled {
   background: #dfe6f0;
   color: #93a2b6;
+  cursor: not-allowed;
+}
+
+/* 示例入口 */
+.examples {
+  margin-top: 10px;
+}
+
+.examples-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93a2b6;
+}
+
+.examples-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 示例问题是整句，一行一条比挤成一排好读 */
+.examples-list.stacked {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.example-chip {
+  max-width: 100%;
+  /* 短标签不该被压扁；overflow:hidden 会把弹性项的自动最小宽度归零 */
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-soft);
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  text-align: left;
+  /* 示例问题是整句，超过一行就截断，不要把控制台撑开 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.example-chip:hover:not(:disabled) {
+  border-color: var(--tide);
+  background: #eaf2fd;
+  color: var(--ink);
+}
+
+.example-chip:focus-visible {
+  outline: 2px solid var(--tide);
+  outline-offset: 2px;
+}
+
+.example-chip:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
