@@ -10,6 +10,22 @@
             <div class="report-meta">
               <span class="report-tag">Prediction Report</span>
               <span class="report-id">ID: {{ reportId || 'REF-2024-X92' }}</span>
+              <div v-if="isComplete" class="report-downloads">
+                <button
+                  class="download-btn"
+                  :disabled="downloading === 'pdf'"
+                  @click="downloadReport('pdf')"
+                >
+                  {{ downloading === 'pdf' ? $t('step4.downloadPreparing') : $t('step4.downloadPdf') }}
+                </button>
+                <button
+                  class="download-btn ghost"
+                  :disabled="downloading === 'md'"
+                  @click="downloadReport('md')"
+                >
+                  {{ downloading === 'md' ? $t('step4.downloadPreparing') : $t('step4.downloadMd') }}
+                </button>
+              </div>
             </div>
             <h1 class="main-title">{{ reportOutline.title }}</h1>
             <p class="sub-title">{{ reportOutline.summary }}</p>
@@ -393,7 +409,8 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, h, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getAgentLog, getConsoleLog } from '../api/report'
+import { getAgentLog, getConsoleLog, downloadReportFile } from '../api/report'
+import { toastError } from '../store/toast'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -410,6 +427,22 @@ const emit = defineEmits(['add-log', 'update-status'])
 const goToInteraction = () => {
   if (props.reportId) {
     router.push({ name: 'Interaction', params: { reportId: props.reportId } })
+  }
+}
+
+// Download
+const downloading = ref('')
+
+const downloadReport = async (format) => {
+  if (!props.reportId || downloading.value) return
+  downloading.value = format
+  try {
+    await downloadReportFile(props.reportId, format)
+    addLog(`Report downloaded: ${props.reportId}.${format}`)
+  } catch (error) {
+    toastError(error?.message || t('step4.downloadFailed'))
+  } finally {
+    downloading.value = ''
   }
 }
 
@@ -2368,6 +2401,7 @@ watch(() => props.reportId, (newId) => {
 .report-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -2380,6 +2414,52 @@ watch(() => props.reportId, (newId) => {
   padding: 4px 8px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+/* 下载按钮靠右，跟标签/ID 拉开距离 */
+.report-downloads {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.download-btn {
+  background: #000000;
+  color: #FFFFFF;
+  border: 1px solid #000000;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.download-btn:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.download-btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.download-btn.ghost {
+  background: transparent;
+  color: #000000;
+}
+
+.download-btn.ghost:hover:not(:disabled) {
+  background: #000000;
+  color: #FFFFFF;
+  opacity: 1;
+}
+
+.download-btn:focus-visible {
+  outline: 2px solid #3b8ff3;
+  outline-offset: 2px;
 }
 
 .report-id {

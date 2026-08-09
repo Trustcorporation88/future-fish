@@ -49,3 +49,48 @@ export const getReport = (reportId) => {
 export const chatWithReport = (data) => {
   return requestWithRetry(() => service.post('/api/report/chat', data), 3, 1000)
 }
+
+/**
+ * 下载报告文件
+ *
+ * 不能用 <a href> 直链：所有 /api/ 都要 Bearer token，浏览器导航不会带上它，
+ * 直链会被 401 打回登录页。所以走 axios 拿 blob，再本地造一个下载。
+ *
+ * @param {string} reportId
+ * @param {'pdf'|'md'} format
+ */
+export const downloadReportFile = async (reportId, format = 'pdf') => {
+  const path = format === 'pdf'
+    ? `/api/report/${reportId}/download/pdf`
+    : `/api/report/${reportId}/download`
+
+  try {
+    const blob = await service.get(path, { responseType: 'blob' })
+    triggerBlobDownload(blob, `${reportId}.${format}`)
+  } catch (error) {
+    // responseType:'blob' 让错误体也变成 Blob，拦截器取不到 data.error，
+    // 用户会看到 "Request failed with status code 500" 这种没用的话。
+    const payload = error?.response?.data
+    if (payload instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await payload.text())
+        if (parsed?.error) error.message = parsed.error
+      } catch {
+        // 不是 JSON 就保持原样
+      }
+    }
+    throw error
+  }
+}
+
+function triggerBlobDownload(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  // Firefox 会在 click 之后异步读 URL，立刻 revoke 会拿到空文件
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}

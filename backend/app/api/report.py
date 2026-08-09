@@ -5,11 +5,12 @@ Report API路由
 
 import os
 import threading
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, make_response
 
 from . import report_bp
 from ..config import Config
 from ..services.report_agent import ReportAgent, ReportManager, ReportStatus
+from ..services.report_pdf import render_markdown_pdf
 from ..services.simulation_manager import SimulationManager
 from ..models.project import ProjectManager
 from ..models.task import TaskManager, TaskStatus
@@ -434,6 +435,55 @@ def download_report(report_id: str):
         
     except Exception as e:
         logger.error(f"下载报告失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            **report_exception()
+        }), 500
+
+
+@report_bp.route('/<report_id>/download/pdf', methods=['GET'])
+def download_report_pdf(report_id: str):
+    """
+    下载报告（PDF格式）
+
+    在内存里渲染，不落盘 —— 报告随时可能被重新生成，缓存一份 PDF 只会不一致。
+    """
+    try:
+        report = ReportManager.get_report(report_id)
+
+        if not report:
+            return jsonify({
+                "success": False,
+                "error": t('api.reportNotFound', id=report_id)
+            }), 404
+
+        md_path = ReportManager._get_report_markdown_path(report_id)
+        if os.path.exists(md_path):
+            with open(md_path, 'r', encoding='utf-8') as f:
+                markdown = f.read()
+        else:
+            markdown = report.markdown_content or ''
+
+        if not markdown.strip():
+            return jsonify({
+                "success": False,
+                "error": t('api.reportEmpty', id=report_id)
+            }), 409
+
+        title = getattr(report, 'title', '') or ''
+        # full_report.md 自己带 H1 标题，别再叠一层
+        heading = '' if markdown.lstrip().startswith('# ') else title
+        pdf_bytes = render_markdown_pdf(markdown, title=heading, footer_label=f'{report_id} · MiroFish')
+
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{report_id}.pdf"'
+        response.headers['Content-Length'] = str(len(pdf_bytes))
+        return response
+
+    except Exception as e:
+        logger.error(f"导出报告PDF失败: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),
