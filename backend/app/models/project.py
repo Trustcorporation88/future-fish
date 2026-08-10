@@ -13,6 +13,7 @@ from enum import Enum
 from dataclasses import dataclass, field, asdict
 from ..config import Config
 from ..utils.ids import validate_id, InvalidIdError
+from ..services import object_store
 
 
 class ProjectStatus(str, Enum):
@@ -104,6 +105,21 @@ class ProjectManager:
     
     # 项目存储根目录
     PROJECTS_DIR = os.path.join(Config.UPLOAD_FOLDER, 'projects')
+
+    # Supabase Storage: só o project.json é espelhado. Ele carrega o nome e a
+    # lista de arquivos que os cards do histórico exibem; os PDFs de origem e o
+    # texto extraído ficam fora, por volume.
+    STORAGE_PREFIX = 'projects'
+    STORAGE_INDEX_FILE = 'project.json'
+    _index_restored = False
+
+    @classmethod
+    def _restore_index_once(cls) -> None:
+        """Repovoa PROJECTS_DIR a partir do Storage, uma vez por processo"""
+        if cls._index_restored or not object_store.enabled():
+            return
+        cls._index_restored = True
+        object_store.hydrate_index(cls.STORAGE_PREFIX, cls.PROJECTS_DIR, cls.STORAGE_INDEX_FILE)
     
     @classmethod
     def _ensure_projects_dir(cls):
@@ -179,20 +195,38 @@ class ProjectManager:
         
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(project.to_dict(), f, ensure_ascii=False, indent=2)
-    
+
+        # Espelha sempre: project.json é pequeno e muda pouco, e sem ele os cards
+        # do histórico ficam sem nome de projeto depois de um redeploy.
+        if object_store.enabled():
+            object_store.mirror_folder(
+                cls.STORAGE_PREFIX, project.project_id,
+                cls._get_project_dir(project.project_id),
+                filenames=[cls.STORAGE_INDEX_FILE],
+            )
+
     @classmethod
     def get_project(cls, project_id: str) -> Optional[Project]:
         """
         获取项目
-        
+
         Args:
             project_id: 项目ID
-            
+
         Returns:
             Project对象，如果不存在返回None
         """
         meta_path = cls._get_project_meta_path(project_id)
-        
+
+        if not os.path.exists(meta_path) and object_store.enabled():
+            try:
+                key = object_store.build_key(
+                    cls.STORAGE_PREFIX, project_id, cls.STORAGE_INDEX_FILE
+                )
+            except object_store.StorageKeyError:
+                return None
+            object_store.hydrate(meta_path, key)
+
         if not os.path.exists(meta_path):
             return None
         
@@ -213,7 +247,8 @@ class ProjectManager:
             项目列表，按创建时间倒序
         """
         cls._ensure_projects_dir()
-        
+        cls._restore_index_once()
+
         projects = []
         for project_id in os.listdir(cls.PROJECTS_DIR):
             # 跳过不符合项目 ID 格式的条目（如 .DS_Store、手工复制的备份目录）：
@@ -244,10 +279,14 @@ class ProjectManager:
             是否删除成功
         """
         project_dir = cls._get_project_dir(project_id)
-        
+
+        # Antes do disco: senão o projeto excluído reaparece no próximo redeploy,
+        # quando a hidratação do índice o encontra de novo no bucket.
+        object_store.delete_folder(cls.STORAGE_PREFIX, project_id)
+
         if not os.path.exists(project_dir):
             return False
-        
+
         shutil.rmtree(project_dir)
         return True
     

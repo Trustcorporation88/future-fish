@@ -24,6 +24,7 @@ from ..utils.logger import get_logger
 from ..utils.locale import get_locale, set_locale
 from .zep_graph_memory_updater import ZepGraphMemoryManager
 from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
+from . import object_store
 
 logger = get_logger('mirofish.simulation_runner')
 
@@ -259,7 +260,21 @@ class SimulationRunner:
     @classmethod
     def _load_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
         """从文件加载运行状态"""
+        from .simulation_manager import SimulationManager
+
         state_file = cls._sim_dir(simulation_id, "run_state.json")
+
+        # Traz do Storage quando o disco foi zerado por um redeploy. O caminho
+        # local continua saindo de RUN_STATE_DIR - só o conteúdo vem de fora.
+        if not os.path.exists(state_file) and object_store.enabled():
+            try:
+                key = object_store.build_key(
+                    SimulationManager.STORAGE_PREFIX, simulation_id, "run_state.json"
+                )
+            except object_store.StorageKeyError:
+                return None
+            object_store.hydrate(state_file, key)
+
         if not os.path.exists(state_file):
             return None
         
@@ -325,6 +340,13 @@ class SimulationRunner:
             json.dump(data, f, ensure_ascii=False, indent=2)
         
         cls._run_states[state.simulation_id] = state
+
+        # Espelha nos estados terminais, junto com os outros JSONs da simulação:
+        # é o run_state que dá as rodadas exibidas no card do histórico.
+        if state.runner_status in (RunnerStatus.COMPLETED, RunnerStatus.FAILED,
+                                   RunnerStatus.STOPPED):
+            from .simulation_manager import SimulationManager
+            SimulationManager.mirror_simulation(state.simulation_id, sim_dir=sim_dir)
     
     @classmethod
     def start_simulation(

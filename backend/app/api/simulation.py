@@ -17,6 +17,7 @@ from ..utils.locale import t, get_locale, set_locale
 from ..utils.errors import report_exception
 from ..utils.ids import validate_id, InvalidIdError
 from ..models.project import ProjectManager
+from ..services.report_agent import ReportManager
 
 logger = get_logger('mirofish.api.simulation')
 
@@ -839,57 +840,23 @@ def list_simulations():
 def _get_report_id_for_simulation(simulation_id: str) -> str:
     """
     获取 simulation 对应的最新 report_id
-    
-    遍历 reports 目录，找出 simulation_id 匹配的 report，
-    如果有多个则返回最新的（按 created_at 排序）
-    
+
+    Delega ao ReportManager em vez de varrer o diretório aqui: é o mesmo índice
+    usado pelo resto do app, e ele sabe reconstruir a listagem a partir do
+    Supabase Storage quando o disco foi zerado por um redeploy.
+
+    Usa list_reports, e não get_report_by_simulation, porque só ela ordena por
+    created_at - a segunda devolve a primeira pasta que casar, na ordem do disco.
+
     Args:
         simulation_id: 模拟ID
-        
+
     Returns:
         report_id 或 None
     """
-    import json
-    from datetime import datetime
-    
-    # reports 目录路径：backend/uploads/reports
-    # __file__ 是 app/api/simulation.py，需要向上两级到 backend/
-    reports_dir = os.path.join(os.path.dirname(__file__), '../../uploads/reports')
-    if not os.path.exists(reports_dir):
-        return None
-    
-    matching_reports = []
-    
     try:
-        for report_folder in os.listdir(reports_dir):
-            report_path = os.path.join(reports_dir, report_folder)
-            if not os.path.isdir(report_path):
-                continue
-            
-            meta_file = os.path.join(report_path, "meta.json")
-            if not os.path.exists(meta_file):
-                continue
-            
-            try:
-                with open(meta_file, 'r', encoding='utf-8') as f:
-                    meta = json.load(f)
-                
-                if meta.get("simulation_id") == simulation_id:
-                    matching_reports.append({
-                        "report_id": meta.get("report_id"),
-                        "created_at": meta.get("created_at", ""),
-                        "status": meta.get("status", "")
-                    })
-            except Exception:
-                continue
-        
-        if not matching_reports:
-            return None
-        
-        # 按创建时间倒序排序，返回最新的
-        matching_reports.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-        return matching_reports[0].get("report_id")
-        
+        reports = ReportManager.list_reports(simulation_id=simulation_id, limit=1)
+        return reports[0].report_id if reports else None
     except Exception as e:
         logger.warning(f"查找 simulation {simulation_id} 的 report 失败: {e}")
         return None

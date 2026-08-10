@@ -23,6 +23,7 @@ from ..utils.llm_client import LLMClient
 from ..utils.logger import get_logger
 from ..utils.locale import get_language_instruction, t
 from ..utils.ids import validate_id, InvalidIdError
+from . import object_store
 from .zep_tools import (
     ZepToolsService, 
     SearchResult, 
@@ -1902,12 +1903,93 @@ class ReportManager:
     
     # 报告存储目录
     REPORTS_DIR = os.path.join(Config.UPLOAD_FOLDER, 'reports')
-    
+
+    # Supabase Storage: prefixo das keys e arquivos que compõem um relatório.
+    # meta.json vem primeiro por ser o índice usado para reconstruir a listagem.
+    STORAGE_PREFIX = 'reports'
+
+    # A reconstrução do índice roda uma vez por processo: o disco só é zerado no
+    # boot de um container novo, e o polling da tela de histórico chamaria a API
+    # de listagem do Supabase a cada request se isto não fosse memorizado.
+    _index_restored = False
+
+    @classmethod
+    def _hydrate_file(cls, report_id: str, filename: str) -> str:
+        """
+        Devolve o caminho local do arquivo, baixando-o do Storage se faltar
+
+        O disco do Railway é zerado a cada deploy; sem isto um relatório já
+        entregue devolve 404 depois do redeploy. Quando o arquivo já está em
+        disco - o caso durante a geração e em todo polling seguinte ao primeiro -
+        não há ida à rede.
+        """
+        local_path = os.path.join(cls._get_report_folder(report_id), filename)
+        if os.path.exists(local_path) or not object_store.enabled():
+            return local_path
+
+        try:
+            key = object_store.build_key(cls.STORAGE_PREFIX, report_id, filename)
+        except object_store.StorageKeyError:
+            return local_path
+
+        object_store.hydrate(local_path, key)
+        return local_path
+
+    @classmethod
+    def _hydrate_sections(cls, report_id: str) -> None:
+        """
+        Traz os arquivos de seção de volta ao disco depois de um redeploy
+
+        Diferente dos outros artefatos, a quantidade de seções não é conhecida de
+        antemão, então aqui listamos o que existe no Storage. Só roda quando a
+        pasta local não tem nenhuma seção - durante a geração ela sempre tem.
+        """
+        if not object_store.enabled():
+            return
+
+        try:
+            folder = cls._get_report_folder(report_id)
+        except InvalidIdError:
+            return
+
+        if os.path.isdir(folder) and any(
+            name.startswith('section_') and name.endswith('.md')
+            for name in os.listdir(folder)
+        ):
+            return
+
+        try:
+            remote_folder = object_store.build_key(cls.STORAGE_PREFIX, report_id)
+        except object_store.StorageKeyError:
+            return
+
+        for name in object_store.list_prefix(remote_folder):
+            if name.startswith('section_') and name.endswith('.md'):
+                cls._hydrate_file(report_id, name)
+
+    @classmethod
+    def get_markdown_path_for_read(cls, report_id: str) -> str:
+        """Caminho do relatório completo para leitura, trazendo-o do Storage se faltar"""
+        return cls._hydrate_file(report_id, "full_report.md")
+
+    @classmethod
+    def get_section_path_for_read(cls, report_id: str, section_index: int) -> str:
+        """Caminho de uma seção para leitura, trazendo-a do Storage se faltar"""
+        return cls._hydrate_file(report_id, f"section_{section_index:02d}.md")
+
+    @classmethod
+    def _restore_index_once(cls) -> None:
+        """Repovoa REPORTS_DIR a partir do Storage, uma vez por processo"""
+        if cls._index_restored or not object_store.enabled():
+            return
+        cls._index_restored = True
+        object_store.hydrate_index(cls.STORAGE_PREFIX, cls.REPORTS_DIR, "meta.json")
+
     @classmethod
     def _ensure_reports_dir(cls):
         """确保报告根目录存在"""
         os.makedirs(cls.REPORTS_DIR, exist_ok=True)
-    
+
     @classmethod
     def _get_report_folder(cls, report_id: str) -> str:
         """
@@ -1981,8 +2063,8 @@ class ReportManager:
                 "has_more": 是否还有更多日志
             }
         """
-        log_path = cls._get_console_log_path(report_id)
-        
+        log_path = cls._hydrate_file(report_id, "console_log.txt")
+
         if not os.path.exists(log_path):
             return {
                 "logs": [],
@@ -2039,8 +2121,8 @@ class ReportManager:
                 "has_more": 是否还有更多日志
             }
         """
-        log_path = cls._get_agent_log_path(report_id)
-        
+        log_path = cls._hydrate_file(report_id, "agent_log.jsonl")
+
         if not os.path.exists(log_path):
             return {
                 "logs": [],
@@ -2250,6 +2332,7 @@ class ReportManager:
         
         返回所有已保存的章节文件信息
         """
+        cls._hydrate_sections(report_id)
         folder = cls._get_report_folder(report_id)
         
         if not os.path.exists(folder):
@@ -2449,12 +2532,36 @@ class ReportManager:
                 f.write(report.markdown_content)
         
         logger.info(t('report.reportSaved', reportId=report.report_id))
-    
+
+        # Espelha no Storage quando o relatório chegou a um estado final: durante a
+        # geração o container está vivo e o disco local basta, então subir a cada
+        # checkpoint só gastaria rede. Falha aqui não invalida o save local.
+        if report.status in (ReportStatus.COMPLETED, ReportStatus.FAILED):
+            cls.mirror_report(report.report_id)
+
+    @classmethod
+    def mirror_report(cls, report_id: str) -> int:
+        """
+        Copia os arquivos do relatório para o Supabase Storage
+
+        Sobe a pasta inteira (meta.json, outline, seções, full_report.md e os dois
+        logs) para que o relatório volte completo depois de um redeploy.
+        """
+        if not object_store.enabled():
+            return 0
+
+        try:
+            folder = cls._get_report_folder(report_id)
+        except InvalidIdError:
+            return 0
+
+        return object_store.mirror_folder(cls.STORAGE_PREFIX, report_id, folder)
+
     @classmethod
     def get_report(cls, report_id: str) -> Optional[Report]:
         """获取报告"""
-        path = cls._get_report_path(report_id)
-        
+        path = cls._hydrate_file(report_id, "meta.json")
+
         if not os.path.exists(path):
             # 兼容旧格式：检查直接存储在reports目录下的文件
             old_path = os.path.join(cls.REPORTS_DIR, f"{report_id}.json")
@@ -2485,7 +2592,7 @@ class ReportManager:
         # 如果markdown_content为空，尝试从full_report.md读取
         markdown_content = data.get('markdown_content', '')
         if not markdown_content:
-            full_report_path = cls._get_report_markdown_path(report_id)
+            full_report_path = cls._hydrate_file(report_id, "full_report.md")
             if os.path.exists(full_report_path):
                 with open(full_report_path, 'r', encoding='utf-8') as f:
                     markdown_content = f.read()
@@ -2511,6 +2618,11 @@ class ReportManager:
         跳过不符合 ID 格式的条目（如 .DS_Store、手工复制的备份目录）：
         这类名字会让 _get_report_folder 的校验抛异常，使整个列表接口失败
         """
+        # Reconstrói o índice quando o disco foi zerado por um redeploy: sem isto
+        # a pasta está vazia e o histórico inteiro desaparece da tela. Baixa só o
+        # meta.json de cada relatório; o Markdown desce quando alguém o abrir.
+        cls._restore_index_once()
+
         for item in os.listdir(cls.REPORTS_DIR):
             if os.path.isdir(os.path.join(cls.REPORTS_DIR, item)):
                 report_id = item
@@ -2577,7 +2689,11 @@ class ReportManager:
         import shutil
         
         folder_path = cls._get_report_folder(report_id)
-        
+
+        # Apaga também no Storage: sem isto o relatório excluído volta no próximo
+        # redeploy, quando a hidratação do índice o vê de novo no bucket.
+        object_store.delete_folder(cls.STORAGE_PREFIX, report_id)
+
         # 新格式：删除整个文件夹
         if os.path.exists(folder_path) and os.path.isdir(folder_path):
             shutil.rmtree(folder_path)

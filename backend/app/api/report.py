@@ -412,8 +412,8 @@ def download_report(report_id: str):
                 "error": t('api.reportNotFound', id=report_id)
             }), 404
         
-        md_path = ReportManager._get_report_markdown_path(report_id)
-        
+        md_path = ReportManager.get_markdown_path_for_read(report_id)
+
         if not os.path.exists(md_path):
             # 如果MD文件不存在，生成一个临时文件
             import tempfile
@@ -458,7 +458,7 @@ def download_report_pdf(report_id: str):
                 "error": t('api.reportNotFound', id=report_id)
             }), 404
 
-        md_path = ReportManager._get_report_markdown_path(report_id)
+        md_path = ReportManager.get_markdown_path_for_read(report_id)
         if os.path.exists(md_path):
             with open(md_path, 'r', encoding='utf-8') as f:
                 markdown = f.read()
@@ -723,7 +723,7 @@ def get_single_section(report_id: str, section_index: int):
         }
     """
     try:
-        section_path = ReportManager._get_section_path(report_id, section_index)
+        section_path = ReportManager.get_section_path_for_read(report_id, section_index)
         
         if not os.path.exists(section_path):
             return jsonify({

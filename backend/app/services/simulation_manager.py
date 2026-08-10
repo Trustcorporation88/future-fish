@@ -20,6 +20,7 @@ from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 from ..utils.locale import t
 from ..utils.ids import validate_id, InvalidIdError
+from . import object_store
 
 logger = get_logger('mirofish.simulation')
 
@@ -127,9 +128,67 @@ class SimulationManager:
     
     # 模拟数据存储目录
     SIMULATION_DATA_DIR = os.path.join(
-        os.path.dirname(__file__), 
+        os.path.dirname(__file__),
         '../../uploads/simulations'
     )
+
+    # Supabase Storage: os três JSONs que sustentam um card do histórico.
+    # Os dados brutos de rodada do OASIS ficam fora, por volume.
+    STORAGE_PREFIX = 'simulations'
+    STORAGE_INDEX_FILE = 'state.json'
+    STORAGE_FILES = ['state.json', 'simulation_config.json', 'run_state.json']
+
+    # Estados em que a simulação não vai mais mudar sozinha. Espelhar só aqui
+    # mantém o laço de execução livre de chamadas de rede.
+    TERMINAL_STATUSES = (
+        SimulationStatus.COMPLETED,
+        SimulationStatus.STOPPED,
+        SimulationStatus.FAILED,
+    )
+
+    _index_restored = False
+
+    @classmethod
+    def mirror_simulation(cls, simulation_id: str, sim_dir: Optional[str] = None) -> int:
+        """Sobe os JSONs de estado da simulação para o Storage"""
+        if not object_store.enabled():
+            return 0
+
+        try:
+            validate_id(simulation_id, 'simulation_id')
+        except InvalidIdError:
+            return 0
+
+        sim_dir = sim_dir or os.path.join(cls.SIMULATION_DATA_DIR, simulation_id)
+        return object_store.mirror_folder(
+            cls.STORAGE_PREFIX, simulation_id, sim_dir, filenames=cls.STORAGE_FILES
+        )
+
+    @classmethod
+    def hydrate_simulation_file(cls, simulation_id: str, filename: str) -> str:
+        """Caminho local do arquivo, trazendo-o do Storage quando o disco foi zerado"""
+        sim_dir = os.path.join(cls.SIMULATION_DATA_DIR, simulation_id)
+        local_path = os.path.join(sim_dir, filename)
+        if os.path.exists(local_path) or not object_store.enabled():
+            return local_path
+
+        try:
+            key = object_store.build_key(cls.STORAGE_PREFIX, simulation_id, filename)
+        except object_store.StorageKeyError:
+            return local_path
+
+        object_store.hydrate(local_path, key)
+        return local_path
+
+    @classmethod
+    def restore_index_once(cls) -> None:
+        """Repovoa SIMULATION_DATA_DIR a partir do Storage, uma vez por processo"""
+        if cls._index_restored or not object_store.enabled():
+            return
+        cls._index_restored = True
+        object_store.hydrate_index(
+            cls.STORAGE_PREFIX, cls.SIMULATION_DATA_DIR, cls.STORAGE_INDEX_FILE
+        )
     
     def __init__(self):
         # 确保目录存在
@@ -161,15 +220,20 @@ class SimulationManager:
             json.dump(state.to_dict(), f, ensure_ascii=False, indent=2)
         
         self._simulations[state.simulation_id] = state
-    
+
+        # Espelha só nos estados terminais: durante a execução o container está
+        # vivo e o disco local basta, e um upload por rodada custaria rede à toa.
+        if state.status in self.TERMINAL_STATUSES:
+            self.mirror_simulation(state.simulation_id)
+
     def _load_simulation_state(self, simulation_id: str) -> Optional[SimulationState]:
         """从文件加载模拟状态"""
         if simulation_id in self._simulations:
             return self._simulations[simulation_id]
-        
-        sim_dir = self._get_simulation_dir(simulation_id)
-        state_file = os.path.join(sim_dir, "state.json")
-        
+
+        self._get_simulation_dir(simulation_id)  # valida o ID e garante o diretório
+        state_file = self.hydrate_simulation_file(simulation_id, "state.json")
+
         if not os.path.exists(state_file):
             return None
         
@@ -486,7 +550,11 @@ class SimulationManager:
     def list_simulations(self, project_id: Optional[str] = None) -> List[SimulationState]:
         """列出所有模拟"""
         simulations = []
-        
+
+        # Reconstrói o índice quando o disco foi zerado por um redeploy: sem isto
+        # o painel de histórico da Home aparece vazio depois de todo deploy.
+        self.restore_index_once()
+
         if os.path.exists(self.SIMULATION_DATA_DIR):
             for sim_id in os.listdir(self.SIMULATION_DATA_DIR):
                 # 跳过隐藏文件（如 .DS_Store）和非目录文件
@@ -531,9 +599,9 @@ class SimulationManager:
     
     def get_simulation_config(self, simulation_id: str) -> Optional[Dict[str, Any]]:
         """获取模拟配置"""
-        sim_dir = self._get_simulation_dir(simulation_id)
-        config_path = os.path.join(sim_dir, "simulation_config.json")
-        
+        self._get_simulation_dir(simulation_id)  # valida o ID e garante o diretório
+        config_path = self.hydrate_simulation_file(simulation_id, "simulation_config.json")
+
         if not os.path.exists(config_path):
             return None
         
