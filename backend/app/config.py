@@ -32,6 +32,9 @@ def refresh_config() -> None:
     Config.VIP_CLIENT_USERNAME = _env_value('VIP_CLIENT_USERNAME', '')
     Config.VIP_CLIENT_PASSWORD = _env_value('VIP_CLIENT_PASSWORD', '')
     Config.VIP_CLIENT_USERS = _env_value('VIP_CLIENT_USERS', '')
+    Config.SUPABASE_URL = _env_value('SUPABASE_URL', '')
+    Config.SUPABASE_SERVICE_KEY = _env_value('SUPABASE_SERVICE_KEY', '')
+    Config.SUPABASE_BUCKET = _env_value('SUPABASE_BUCKET', 'mirofish')
 
 def _env_value(name: str, default: str | None = None) -> str | None:
     """读取环境变量，并兼容 Warp/模板中常见的 {{valor}} 占位写法。"""
@@ -81,6 +84,12 @@ class Config:
     # Market data配置
     FINNHUB_API_KEY = _env_value('FINNHUB_API_KEY', '')
     BRAPI_TOKEN = _env_value('BRAPI_TOKEN', '')
+
+    # Supabase Storage (arquivo durável entre deploys)
+    # O filesystem do Railway é efêmero; sem isto, uploads/ some a cada redeploy.
+    SUPABASE_URL = _env_value('SUPABASE_URL', '')
+    SUPABASE_SERVICE_KEY = _env_value('SUPABASE_SERVICE_KEY', '')
+    SUPABASE_BUCKET = _env_value('SUPABASE_BUCKET', 'mirofish')
     
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
@@ -128,6 +137,16 @@ class Config:
                 "de emitir ou validar sessoes VIP - nao ha fallback padrao por seguranca."
             )
         return secret
+
+    @classmethod
+    def storage_enabled(cls) -> bool:
+        """
+        Espelhamento no Supabase Storage ativo
+
+        Oportunista como o VIP auth: sem URL e chave de servico, todo caminho de
+        leitura e escrita continua puramente local e nada muda de comportamento.
+        """
+        return bool(cls.SUPABASE_URL and cls.SUPABASE_SERVICE_KEY)
 
     @classmethod
     def vip_auth_enabled(cls) -> bool:
