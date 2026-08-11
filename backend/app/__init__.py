@@ -110,6 +110,13 @@ def create_app(config_class=Config):
             'status': 'ok' if not config_errors else 'degraded',
             'service': 'MiroFish Backend',
             'config_errors': config_errors,
+            # O Storage é todo interno: não cria rota nem muda resposta de API. Sem
+            # isto aqui não há como saber de fora se um deploy subiu com a
+            # persistência ligada - só gerando relatório e olhando o bucket.
+            'storage': {
+                'enabled': Config.storage_enabled(),
+                'bucket': Config.SUPABASE_BUCKET if Config.storage_enabled() else None,
+            },
         }
     
     _register_frontend(app)
