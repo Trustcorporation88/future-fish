@@ -108,14 +108,53 @@ def put_bytes(key: str, data: bytes, content_type: str = 'application/octet-stre
         return False
 
 
+def _is_missing(response) -> bool:
+    """
+    A resposta diz "esse objeto não existe", em qualquer um dos dois dialetos
+
+    A Storage REST API do Supabase não responde 404 nu para objeto ausente: manda
+    **HTTP 400** com o 404 no corpo -
+
+        {"statusCode":"404","error":"not_found","message":"Object not found",
+         "code":"NoSuchKey"}
+
+    Confiar só no status transforma todo cache miss em "Storage get falhou: HTTP
+    400" no log. Isso importa porque ausência é o caminho normal: hydrate() e
+    hydrate_index() leem justamente o que não está em disco depois de um redeploy,
+    que é o momento em que alguém abre o log para ver se a persistência pegou. Com
+    o miss gritando warning, uma chave revogada (401), um bucket apagado (404) ou
+    throttling (429) ficam indistinguíveis do funcionamento normal.
+
+    Aceita os dois dialetos: quem trocar de provedor - ou mockar com 404 nu - segue
+    valendo.
+    """
+    if response.status_code == 404:
+        return True
+    if response.status_code >= 400:
+        try:
+            body = response.json()
+        except (ValueError, AttributeError):
+            return False
+        if not isinstance(body, dict):
+            return False
+        return (str(body.get('statusCode')) == '404'
+                or body.get('error') == 'not_found'
+                or body.get('code') == 'NoSuchKey')
+    return False
+
+
 def get_bytes(key: str) -> Optional[bytes]:
-    """Lê um objeto. None quando não existe ou quando a leitura falha."""
+    """
+    Lê um objeto. None quando não existe ou quando a leitura falha.
+
+    Ausência não é falha e não vira warning - ver _is_missing().
+    """
     if not enabled():
         return None
 
     try:
         response = requests.get(_object_url(key), headers=_headers(), timeout=_TIMEOUT)
-        if response.status_code == 404:
+        if _is_missing(response):
             return None
         if response.status_code >= 400:
             logger.warning(f"Storage get falhou em {key}: HTTP {response.status_code}")

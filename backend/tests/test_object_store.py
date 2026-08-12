@@ -180,6 +180,81 @@ class TestNetworkFailureNeverPropagates(StorageTestCase):
             self.assertEqual(object_store.list_prefix('reports'), [])
 
 
+class TestMissingObjectIsNotAFailure(StorageTestCase):
+    """
+    Objeto ausente é caminho normal, não incidente
+
+    A Storage REST API do Supabase responde objeto ausente com HTTP 400 e o 404
+    dentro do corpo. Como hydrate() só busca o que não está em disco, tratar isso
+    como erro faz todo cache miss depois de um redeploy virar warning - e aí uma
+    chave revogada não se distingue do funcionamento normal no log.
+    """
+
+    NOT_FOUND_BODY = {'statusCode': '404', 'error': 'not_found',
+                      'message': 'Object not found', 'code': 'NoSuchKey'}
+
+    def setUp(self):
+        super().setUp()
+        self.set_storage()
+        patcher = patch.object(object_store, 'logger', autospec=True)
+        self.logger = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def response(self, status, body=None, no_json=False):
+        response = Mock(status_code=status)
+        if no_json:
+            response.json.side_effect = ValueError('não é JSON')
+        else:
+            response.json.return_value = body
+        return response
+
+    def get_with(self, response):
+        with patch.object(object_store.requests, 'get', return_value=response):
+            return object_store.get_bytes('reports/report_abc/meta.json')
+
+    def test_supabase_dialect_is_silent(self):
+        self.assertIsNone(self.get_with(self.response(400, self.NOT_FOUND_BODY)))
+        self.logger.warning.assert_not_called()
+
+    def test_bare_404_is_silent(self):
+        """Outro provedor - ou um mock mais simples - segue valendo"""
+        self.assertIsNone(self.get_with(self.response(404)))
+        self.logger.warning.assert_not_called()
+
+    def test_revoked_key_still_warns(self):
+        """O caso que o ruído do cache miss estava escondendo"""
+        self.assertIsNone(self.get_with(self.response(401, {'message': 'Invalid JWT'})))
+        self.logger.warning.assert_called_once()
+
+    def test_other_failures_still_warn(self):
+        for status, body, no_json in ((500, None, True),
+                                      (429, {'message': 'slow down'}, False),
+                                      (400, {'error': 'invalid_bucket'}, False),
+                                      (400, None, True)):
+            with self.subTest(status=status, no_json=no_json):
+                self.logger.warning.reset_mock()
+                self.assertIsNone(self.get_with(self.response(status, body, no_json)))
+                self.logger.warning.assert_called_once()
+
+    def test_hydrate_on_miss_is_silent_and_writes_nothing(self):
+        missing = os.path.join(self.temp_dir, 'novo', 'full_report.md')
+        with patch.object(object_store.requests, 'get',
+                          return_value=self.response(400, self.NOT_FOUND_BODY)):
+            self.assertFalse(object_store.hydrate(missing, 'reports/report_abc/full_report.md'))
+        self.assertFalse(os.path.exists(missing))
+        self.logger.warning.assert_not_called()
+
+    def test_hydrate_index_over_an_empty_bucket_is_silent(self):
+        """Primeiro deploy com o bucket vazio: nada a restaurar, nada a alarmar"""
+        listing = Mock(status_code=200, **{'json.return_value': [{'name': 'report_aaa'}]})
+        with patch.object(object_store.requests, 'post', return_value=listing), \
+             patch.object(object_store.requests, 'get',
+                          return_value=self.response(400, self.NOT_FOUND_BODY)):
+            self.assertEqual(
+                object_store.hydrate_index('reports', self.temp_dir, 'meta.json'), 0)
+        self.logger.warning.assert_not_called()
+
+
 class FakeBucket:
     """Bucket em memória falando o dialeto HTTP da Storage REST API do Supabase"""
 
@@ -212,7 +287,10 @@ class FakeBucket:
     def get(self, url, headers=None, timeout=None):
         data = self.objects.get(self._key(url))
         if data is None:
-            return Mock(status_code=404)
+            # O dialeto real: 400 com o 404 no corpo, não 404 nu
+            return Mock(status_code=400, **{'json.return_value': {
+                'statusCode': '404', 'error': 'not_found',
+                'message': 'Object not found', 'code': 'NoSuchKey'}})
         return Mock(status_code=200, content=data)
 
     def delete(self, url, json=None, headers=None, timeout=None):
