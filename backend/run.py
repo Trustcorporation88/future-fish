@@ -26,13 +26,10 @@ def main():
     """主函数"""
     refresh_config()
     errors = Config.validate()
-    # DEBUG: log SUPABASE vars
-    import logging as _log
-    _dbg = _log.getLogger('mirofish.startup')
-    _dbg.info("DEBUG SUPABASE_URL set=%s len=%d", bool(Config.SUPABASE_URL), len(Config.SUPABASE_URL or ''))
-    _dbg.info("DEBUG SUPABASE_SERVICE_KEY set=%s len=%d", bool(Config.SUPABASE_SERVICE_KEY), len(Config.SUPABASE_SERVICE_KEY or ''))
-    _dbg.info("DEBUG SUPABASE_BUCKET=%s", Config.SUPABASE_BUCKET)
-    _dbg.info("DEBUG storage_enabled=%s", Config.storage_enabled())
+    print(f"[DEBUG] SUPABASE_URL={bool(Config.SUPABASE_URL)} len={len(Config.SUPABASE_URL or '')}", flush=True)
+    print(f"[DEBUG] SUPABASE_SERVICE_KEY={bool(Config.SUPABASE_SERVICE_KEY)} len={len(Config.SUPABASE_SERVICE_KEY or '')}", flush=True)
+    print(f"[DEBUG] SUPABASE_BUCKET={Config.SUPABASE_BUCKET!r}", flush=True)
+    print(f"[DEBUG] storage_enabled={Config.storage_enabled()}", flush=True)
     if errors:
         print("Aviso de configuracao (app sobe, mas simulacoes podem falhar):")
         for err in errors:
