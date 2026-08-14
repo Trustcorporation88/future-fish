@@ -26,10 +26,6 @@ def main():
     """主函数"""
     refresh_config()
     errors = Config.validate()
-    print("[DEBUG_A] SUPABASE_URL=" + repr(Config.SUPABASE_URL), flush=True)
-    print("[DEBUG_B] SUPABASE_SERVICE_KEY=" + repr(Config.SUPABASE_SERVICE_KEY), flush=True)
-    print("[DEBUG_C] SUPABASE_BUCKET=" + repr(Config.SUPABASE_BUCKET), flush=True)
-    print("[DEBUG_D] storage_enabled=" + repr(Config.storage_enabled()), flush=True)
     if errors:
         print("Aviso de configuracao (app sobe, mas simulacoes podem falhar):")
         for err in errors:

@@ -37,10 +37,19 @@ def refresh_config() -> None:
     Config.SUPABASE_BUCKET = _env_value('SUPABASE_BUCKET', 'mirofish')
 
 def _env_value(name: str, default: str | None = None) -> str | None:
-    """读取环境变量，并兼容 Warp/模板中常见的 {{valor}} 占位写法。"""
-    value = os.environ.get(name, default)
+    """读取环境变量，并兼容 Warp/模板中常见的 {{valor}} 占位写法。
+
+    同时兼容 Railway dashboard 可能的键名尾部空白（e.g. ``SUPABASE_URL  ``）。
+    """
+    value = os.environ.get(name)
     if value is None:
-        return None
+        # 遍历环境变量按 strip 后的键名匹配（一次 O(n) 扫描，只在未命中时执行）
+        for key, val in os.environ.items():
+            if key.strip() == name and val is not None:
+                value = val
+                break
+    if value is None:
+        return default
 
     value = value.strip()
     if value.startswith('{{') and value.endswith('}}') and len(value) > 4:
